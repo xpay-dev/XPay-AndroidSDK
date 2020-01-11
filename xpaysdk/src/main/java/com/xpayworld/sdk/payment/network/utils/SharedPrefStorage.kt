@@ -4,6 +4,7 @@ import android.content.Context
 
 
 class SharedPrefStorage(context: Context) : SharedPref{
+    private val PREF_DEV = "kXpayWorldSharedPref"
     override fun removeKey(key: String) {
          mContext.getSharedPreferences(PREF_DEV,Context.MODE_PRIVATE).edit().remove(key).apply()
     }

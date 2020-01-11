@@ -3,6 +3,8 @@ package com.xpayworld.sdk.payment.network.activation
 import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.network.APIConstant
 import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.PaymentService
+import io.reactivex.Observable
 
 import io.reactivex.Single
 import retrofit2.Response
@@ -25,7 +27,7 @@ class Activation {
     var model: String? = null
 
     @SerializedName("OS")
-    var os: String? = null
+    private var os: String? = null
 
     @SerializedName("POSWSRequest")
     var posWsRequest: PosWS.REQUEST? = null
@@ -37,6 +39,7 @@ class Activation {
     var platform = "Android"
     @SerializedName("PosType")
     var postType = "BBPOS"
+
 
     class REQUEST(data: Activation) {
         @SerializedName("posInfo")
@@ -53,7 +56,7 @@ class Activation {
             APIConstant.Charset,
             APIConstant.Content)
         @POST(APIConstant.ActivateApp)
-        fun activation(@Body activate :  REQUEST): Single<Response<RESULT>>
+        fun activation(@Body activate :  REQUEST): Observable<Response<RESULT>>
     }
 
 }

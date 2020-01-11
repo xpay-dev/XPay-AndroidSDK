@@ -7,6 +7,7 @@ import com.xpayworld.payment.network.PosWS
 
 import com.xpayworld.payment.util.SharedPrefStorage
 import com.xpayworld.sdk.payment.PaymentService
+import io.reactivex.Observable
 import io.reactivex.Single
 import retrofit2.Response
 import retrofit2.http.Body
@@ -17,7 +18,7 @@ import retrofit2.http.POST
 class Login {
 
     @SerializedName("AppVersion")
-    var appVersion = ""
+    var appVersion = "1"
 
     @SerializedName("Pin")
     var pin = ""
@@ -26,7 +27,7 @@ class Login {
     var password = ""
 
     @SerializedName("Username")
-     var userName = ""
+    var userName = ""
 
     @SerializedName("POSWSRequest")
     private var posWsRequest: PosWS.REQUEST? = null
@@ -38,9 +39,9 @@ class Login {
         posWsRequest  = posReq
     }
 
-    class REQUEST {
+    class REQUEST(data: Login) {
         @SerializedName("request")
-        var data : Login? = null
+        var data = data
     }
     class RESULT {
         @SerializedName("LoginByMobilePinResult")
@@ -52,6 +53,6 @@ class Login {
             APIConstant.Charset,
             APIConstant.Content)
         @POST(APIConstant.Login)
-        fun login(@Body login: REQUEST) : Single<Response<RESULT>>
+        fun login(@Body login: REQUEST) : Observable<Response<RESULT>>
     }
 }
