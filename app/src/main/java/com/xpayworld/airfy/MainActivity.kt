@@ -4,6 +4,9 @@ import android.bluetooth.BluetoothDevice
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import com.xpayworld.sdk.payment.*
+import com.xpayworld.sdk.payment.network.RetrofitClient
+import com.xpayworld.sdk.payment.network.activation.Activation
+import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
@@ -28,9 +31,25 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
 
         service?.startDevice(ActionType.SALE(saleData))
+
+
+        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
+
+        var data = Activation()
+        data.imei=  ""
+
+        api.activation(Activation.REQUEST(data))
+
+
+
+        btn_connect.setOnClickListener {
+            service?.setBTConnection(device = devices1!![0])
+        }
     }
 
     override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
+
+        devices1 = devices
 
     }
 }

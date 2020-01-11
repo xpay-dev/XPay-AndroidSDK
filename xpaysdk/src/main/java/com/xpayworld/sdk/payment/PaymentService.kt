@@ -55,7 +55,9 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     private var mSale: SaleData? = null
     private var mActionType: ActionType? = null
 
+
     init {
+        CONTEXT = mContext
         mDeviceListener = BBPOSDeviceListener(listener)
         mBBDeviceController = BBDeviceController.getInstance(mContext, mDeviceListener)
         BBDeviceController.setDebugLogEnabled(true)
@@ -142,6 +144,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     companion object {
         fun valueOf(value: Int): BBDeviceController.CheckCardMode? =
             BBDeviceController.CheckCardMode.values().find { it.value == value }
+        lateinit  var CONTEXT : Context
     }
 
     private inner class BBPOSDeviceListener(private val listener: PaymentServiceListener) :
