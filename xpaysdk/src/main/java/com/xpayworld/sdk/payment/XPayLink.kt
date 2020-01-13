@@ -15,8 +15,9 @@ enum class Connection {
 
 sealed class ActionType {
     // for transaction
-    data class SALE(var saleData: SaleData) : ActionType()
+    data class SALE(var sale: Sale) : ActionType()
     object PRINTER : ActionType()
+    object REFUND : ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -29,7 +30,7 @@ enum class CardMode(val value: Int) {
     INSERT_OR_TAP(6),
 }
 
-class SaleData {
+class Sale {
     var amount: Int? = null
     var currency: String? = null
     var currencyCode: Int? = null
@@ -41,9 +42,11 @@ class SaleData {
 
 interface PaymentServiceListener {
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
+    fun onTransactionResult(result: Int?, message: String?)
+    fun onDeviceError(error : Int?, message : String?)
 }
 
-class PaymentService(private val mContext: Context, listener: PaymentServiceListener) {
+class XPayLink {
 
     private val CARD_MODE: BBDeviceController.CheckCardMode? = null
     private val DEVICE_NAMES = arrayOf("WP")
@@ -52,11 +55,22 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     private var mDeviceListener: BBPOSDeviceListener? = null
     private var mSelectedDevice: BluetoothDevice? = null
 
-    private var mSale: SaleData? = null
+    private var mSale: Sale? = null
     private var mActionType: ActionType? = null
 
-
     init {
+        INSTANCE = this
+    }
+
+    companion object {
+        fun valueOf(value: Int): BBDeviceController.CheckCardMode? =
+            BBDeviceController.CheckCardMode.values().find { it.value == value }
+
+        lateinit var CONTEXT : Context
+        var INSTANCE : XPayLink = XPayLink()
+    }
+
+    fun attach(mContext: Context, listener: PaymentServiceListener) {
         CONTEXT = mContext
         mDeviceListener = BBPOSDeviceListener(listener)
         mBBDeviceController = BBDeviceController.getInstance(mContext, mDeviceListener)
@@ -64,7 +78,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     }
 
     /**
-     * Payment Service Configuration
+     * Start Device
      *
      * @param type             Integer   eg. 1,0023.40 = 1002340
      * @param currency       String   eg. PHP = Philippine Peso
@@ -79,7 +93,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         when (type) {
             is ActionType.SALE -> {
 
-                mSale = type.saleData
+                mSale = type.sale
 
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
@@ -91,6 +105,10 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
                 }
             }
             is ActionType.PRINTER -> {
+
+            }
+
+            is ActionType.REFUND -> {
 
             }
         }
@@ -129,6 +147,8 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
             CurrencyCharacter.P
         )
 
+        println(currencyCharacter[0].value)
+
         // Configure Amount
         input.put("amount", "${mSale?.amount}")
         input.put("transactionType", BBDeviceController.TransactionType.GOODS)
@@ -141,11 +161,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         mBBDeviceController?.setAmount(input)
     }
 
-    companion object {
-        fun valueOf(value: Int): BBDeviceController.CheckCardMode? =
-            BBDeviceController.CheckCardMode.values().find { it.value == value }
-        lateinit  var CONTEXT : Context
-    }
+
 
     private inner class BBPOSDeviceListener(private val listener: PaymentServiceListener) :
         BBDeviceController.BBDeviceControllerListener {
@@ -280,8 +296,8 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
 
         }
 
-        override fun onReturnTransactionResult(p0: BBDeviceController.TransactionResult?) {
-
+        override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
+            listener.onTransactionResult(result?.ordinal , result?.name)
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {
@@ -534,8 +550,8 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
 
         }
 
-        override fun onError(p0: BBDeviceController.Error?, p1: String?) {
-
+        override fun onError(error: BBDeviceController.Error?, p1: String?) {
+            listener.onDeviceError(error?.ordinal,p1)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {

@@ -1,12 +1,10 @@
-package com.xpayworld.sdk.payment.network.activation
+package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.network.APIConstant
 import com.xpayworld.payment.network.PosWS
-import com.xpayworld.sdk.payment.PaymentService
 import io.reactivex.Observable
 
-import io.reactivex.Single
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Headers
