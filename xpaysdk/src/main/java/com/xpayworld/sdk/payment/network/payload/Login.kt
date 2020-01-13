@@ -4,8 +4,7 @@ import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.network.APIConstant
 import com.xpayworld.payment.network.PosWS
 
-import com.xpayworld.payment.util.SharedPrefStorage
-import com.xpayworld.sdk.payment.XPayLink
+import com.xpayworld.payment.util.SharedPref
 import io.reactivex.Observable
 import retrofit2.Response
 import retrofit2.http.Body
@@ -31,7 +30,7 @@ class Login {
     private var posWsRequest: PosWS.REQUEST? = null
 
     init {
-        val sharedPref = XPayLink.CONTEXT.let { SharedPrefStorage(it) }
+        val sharedPref = SharedPref.INSTANCE
         val posReq = PosWS.REQUEST()
         posReq.activationKey = sharedPref.readMessage(PosWS.PREF_ACTIVATION)
         posWsRequest  = posReq

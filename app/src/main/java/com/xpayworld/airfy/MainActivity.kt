@@ -15,15 +15,13 @@ import kotlinx.android.synthetic.main.activity_main.*
 class MainActivity : AppCompatActivity() ,PaymentServiceListener {
     private lateinit var subscription: Disposable
     var devices1: MutableList<BluetoothDevice>? = null
-    var service : XPayLink? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
 
-          XPayLink.INSTANCE.attach(this, this)
-
+        XPayLink.INSTANCE.attach(this, this)
 
         val saleData = Sale()
         saleData.amount = 10000
@@ -37,8 +35,6 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
 
 //        service?.startDevice(ActionType.SALE(saleData))
-
-
 //        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
 //
 //        var pos = PosWS.REQUEST()
@@ -55,7 +51,6 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //            .subscribe {
 //
 //                val sharedPref = applicationContext.let { SharedPrefStorage(it) }
-//
 //                sharedPref.writeMessage(PosWS.PREF_ACTIVATION,pos.activationKey!!)
 //
 //            }
@@ -76,6 +71,8 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
     override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
         devices1 = devices
     }
+
+
 
     override fun onTransactionResult(result: Int?, message: String?) {
         println("Transaction RESULT  ${result}  : ${message} ")

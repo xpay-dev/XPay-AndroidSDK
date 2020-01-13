@@ -1,8 +1,7 @@
 package com.xpayworld.payment.network
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.util.SharedPrefStorage
-import com.xpayworld.sdk.payment.XPayLink
+import com.xpayworld.payment.util.SharedPref
 
 class PosWS {
     companion object {
@@ -28,7 +27,7 @@ class PosWS {
 
 
         init {
-            val sharedPref = XPayLink.CONTEXT.let { SharedPrefStorage(it) }
+            val sharedPref = SharedPref.INSTANCE
             activationKey = sharedPref.readMessage(PREF_ACTIVATION)
             rToken = sharedPref.readMessage(PREF_RTOKEN)
         }

@@ -79,8 +79,8 @@ data class TransactionResult(
     @SerializedName("Tax2Rate")
     var tax2Rate: String?,
 
-//    @SerializedName("POSWSResponse")
-//    var result: PosWsResponse? = null
+//  @SerializedName("POSWSResponse")
+//  var result: PosWsResponse? = null
 
     @SerializedName("TerminalId")
     var terminalId: String?,

@@ -37,11 +37,13 @@ class Sale {
     var orderId: String? = null
     var connection: Connection? = null
     var cardMode: CardMode? = null
+    var timeOut: Int? = 60
 }
 
 
 interface PaymentServiceListener {
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
+
     fun onTransactionResult(result: Int?, message: String?)
     fun onDeviceError(error : Int?, message : String?)
 }
@@ -186,6 +188,7 @@ class XPayLink {
         }
 
         override fun onRequestSelectApplication(p0: ArrayList<String>?) {
+            mBBDeviceController?.selectApplication(0)
 
         }
 
