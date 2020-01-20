@@ -6,6 +6,11 @@ import android.content.Context
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
+import com.xpayworld.payment.network.PosWS
+import com.xpayworld.payment.util.SharedPref
+import com.xpayworld.sdk.payment.network.transaction.EnumCompanion
+import com.xpayworld.sdk.payment.network.utils.ProgressDialog
+import com.xpayworld.sdk.payment.network.utils.Response
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,6 +42,7 @@ class Sale {
     var orderId: String? = null
     var connection: Connection? = null
     var cardMode: CardMode? = null
+    var isOffile: Boolean? = false
     var timeOut: Int? = 60
 }
 
@@ -45,9 +51,10 @@ interface PaymentServiceListener {
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
 
     fun onTransactionResult(result: Int?, message: String?)
-    fun onDeviceError(error : Int?, message : String?)
+    fun onError(error : Int?, message : String?)
 }
 
+@Suppress("INCOMPATIBLE_ENUM_COMPARISON")
 class XPayLink {
 
     private val CARD_MODE: BBDeviceController.CheckCardMode? = null
@@ -59,6 +66,7 @@ class XPayLink {
 
     private var mSale: Sale? = null
     private var mActionType: ActionType? = null
+    private var mListener:  PaymentServiceListener? = null
 
     init {
         INSTANCE = this
@@ -74,7 +82,8 @@ class XPayLink {
 
     fun attach(mContext: Context, listener: PaymentServiceListener) {
         CONTEXT = mContext
-        mDeviceListener = BBPOSDeviceListener(listener)
+        mListener = listener
+        mDeviceListener = BBPOSDeviceListener()
         mBBDeviceController = BBDeviceController.getInstance(mContext, mDeviceListener)
         BBDeviceController.setDebugLogEnabled(true)
     }
@@ -97,11 +106,23 @@ class XPayLink {
 
                 mSale = type.sale
 
+                if(!isActivated()){
+                    mListener?.onError(Response.ACTIVATION_FAILED.value,Response.ACTIVATION_FAILED.name)
+                    return@startDevice
+                }
+
+                if(!hasEnteredPin()){
+                    mListener?.onError(Response.ENTER_PIN_FAILED.value,Response.ENTER_PIN_FAILED.name)
+                    return@startDevice
+                }
+
+
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
 
                     }
                     Connection.BLUETOOTH -> {
+                        ProgressDialog.INSTANCE.attach(CONTEXT)
                         mBBDeviceController?.startBTScan(DEVICE_NAMES, 120)
                     }
                 }
@@ -125,9 +146,19 @@ class XPayLink {
         mBBDeviceController?.connectBT(device)
     }
 
+    fun isActivated(): Boolean{
+        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
+    }
+
+    fun hasEnteredPin(): Boolean{
+        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
+    }
+
+
 
     @SuppressLint("SimpleDateFormat")
     private fun startEMV() {
+        ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
         data["emvOption"] = BBDeviceController.EmvOption.START
         data["orderID"] = "${mSale?.orderId}"
@@ -140,8 +171,10 @@ class XPayLink {
     }
 
     private fun setAmount() {
-        val input: Hashtable<String, Any> = Hashtable() //define empty hashmap
+        ProgressDialog.INSTANCE.show()
+        ProgressDialog.INSTANCE.message("CONFIRM AMOUNT")
 
+        val input: Hashtable<String, Any> = Hashtable() //define empty hashmap
         // Currency Sign
         val currencyCharacter = arrayOf(
             CurrencyCharacter.P,
@@ -165,7 +198,7 @@ class XPayLink {
 
 
 
-    private inner class BBPOSDeviceListener(private val listener: PaymentServiceListener) :
+    private inner class BBPOSDeviceListener :
         BBDeviceController.BBDeviceControllerListener {
 
         override fun onReturnUpdateAIDResult(p0: Hashtable<String, BBDeviceController.TerminalSettingStatus>?) {
@@ -193,6 +226,7 @@ class XPayLink {
         }
 
         override fun onRequestDisplayText(p0: BBDeviceController.DisplayText?) {
+            ProgressDialog.INSTANCE.message(p0.toString())
 
         }
 
@@ -237,6 +271,8 @@ class XPayLink {
 
         override fun onRequestOnlineProcess(p0: String?) {
 
+            mBBDeviceController?.sendOnlineProcessResult("8A023030")
+            //8A023030
         }
 
         override fun onReturnNfcDataExchangeResult(p0: Boolean, p1: Hashtable<String, String>?) {
@@ -300,7 +336,8 @@ class XPayLink {
         }
 
         override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
-            listener.onTransactionResult(result?.ordinal , result?.name)
+            mListener?.onTransactionResult(result?.ordinal , result?.name)
+            ProgressDialog.INSTANCE.dismiss()
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {
@@ -330,7 +367,7 @@ class XPayLink {
         }
 
         override fun onBTReturnScanResults(devices: MutableList<BluetoothDevice>?) {
-            listener.onBluetoothScanResult(devices)
+            mListener?.onBluetoothScanResult(devices)
         }
 
         override fun onEnterStandbyMode() {
@@ -437,7 +474,7 @@ class XPayLink {
         }
 
         override fun onRequestFinalConfirm() {
-
+           mBBDeviceController?.sendFinalConfirmResult(true)
         }
 
         override fun onReturnBarcode(p0: String?) {
@@ -512,7 +549,28 @@ class XPayLink {
         }
 
         override fun onWaitingForCard(p0: BBDeviceController.CheckCardMode?) {
-
+            var resp = ""
+            when (mSale?.cardMode?.value) {
+                BBDeviceController.CheckCardMode.INSERT.value -> {
+                    resp =  "PLEASE INSERT CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE.value -> {
+                    resp = "PLEASE SWIPE CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_INSERT.value -> {
+                    resp = "PLEASE SWIPE/INSERT CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_TAP.value -> {
+                    resp = "PLEASE SWIPE/TAP CARD"
+                }
+                BBDeviceController.CheckCardMode.INSERT_OR_TAP.value -> {
+                    resp = "PLEASE inert/TAP CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_INSERT_OR_TAP.value -> {
+                    resp = "PLEASE SWIPE/INSERT/TAP CARD"
+                }
+            }
+            ProgressDialog.INSTANCE.message(resp)
         }
 
         override fun onReturnCheckCardResult(
@@ -554,7 +612,8 @@ class XPayLink {
         }
 
         override fun onError(error: BBDeviceController.Error?, p1: String?) {
-            listener.onDeviceError(error?.ordinal,p1)
+            ProgressDialog.INSTANCE.dismiss()
+            mListener?.onError(error?.ordinal,p1)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {

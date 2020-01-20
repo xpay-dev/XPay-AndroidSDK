@@ -5,8 +5,9 @@ import com.xpayworld.payment.util.SharedPref
 
 class PosWS {
     companion object {
-        const val PREF_ACTIVATION = "kActivation"
-        const val PREF_RTOKEN = "kRtoken"
+        const val PREF_ACTIVATION = "kActivationSecret"
+        const val PREF_RTOKEN = "kRtokenSession"
+        const val PREF_PIN = "kPinEnteredSecrete"
     }
 
     class REQUEST {

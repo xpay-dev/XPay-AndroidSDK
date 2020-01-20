@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         saleData.currency = "PHP"
         saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
         saleData.orderId = "0123456789ABCDEF0123456789ABCD"
-
+        saleData.isOffile = true
         XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
 
@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         println("Transaction RESULT  ${result}  : ${message} ")
     }
 
-    override fun onDeviceError(error: Int?, message: String?) {
+    override fun onError(error: Int?, message: String?) {
 
         println("Device ERROR  ${error}  : ${message} ")
 
