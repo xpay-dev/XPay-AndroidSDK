@@ -7,7 +7,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
-import android.widget.ProgressBar
+import android.widget.TextView
 import com.xpayworld.sdk.payment.R
 
 
@@ -20,7 +20,7 @@ fun setProgressDialog(context: Context): Dialog {
 }
 
 class ProgressDialog {
-    var mBuilder : android.app.ProgressDialog?= null
+    var mBuilder : Dialog?= null
     init {
         INSTANCE = this
     }
@@ -30,7 +30,10 @@ class ProgressDialog {
 
     fun attach(context: Context) {
 
-        val dialog = android.app.ProgressDialog(context)
+        val dialog = Dialog(context)
+        val inflate = LayoutInflater.from(context).inflate(R.layout.layout_loading_dialog, null)
+
+        dialog.setContentView(inflate)
         dialog.setCancelable(false)
         mBuilder = dialog
 
@@ -43,7 +46,8 @@ class ProgressDialog {
         mBuilder?.dismiss()
     }
 
-    fun message(msg: String){
-        mBuilder?.setMessage(msg)
+    fun message(msg : String){
+       val text = mBuilder?.findViewById<TextView>(R.id.tv_message)
+        text?.text = msg
     }
 }
