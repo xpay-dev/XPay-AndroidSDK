@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.network.APIConstant
 import com.xpayworld.payment.network.PosWS
 import io.reactivex.Observable
+import io.reactivex.Single
 
 import retrofit2.Response
 import retrofit2.http.Body

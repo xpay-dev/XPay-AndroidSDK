@@ -23,35 +23,36 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
         XPayLink.INSTANCE.attach(this, this)
 
-        val saleData = Sale()
-        saleData.amount = 10000
-        saleData.connection = Connection.BLUETOOTH
-        saleData.currencyCode = 608
-        saleData.currency = "PHP"
-        saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-        saleData.orderId = "0123456789ABCDEF0123456789ABCD"
-        saleData.isOffile = true
-        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
+//        val saleData = Sale()
+//        saleData.amount = 10000
+//        saleData.connection = Connection.BLUETOOTH
+//        saleData.currencyCode = 608
+//        saleData.currency = "PHP"
+//        saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
+//        saleData.orderId = "0123456789ABCDEF0123456789ABCD"
+//        saleData.isOffile = true
+//        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
+
 
 
 //        service?.startDevice(ActionType.SALE(saleData))
-//        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
-//
-//        var pos = PosWS.REQUEST()
-//        pos.activationKey = "1VEFF5YUBV39ARIZ"
-//
-//
-//        var data = Activation()
-//        data.imei=  ""
-//        data.manufacturer = ""
-//        data.ip = "0.0.0"
-//        data.posWsRequest = pos
+        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
+
+        var pos = PosWS.REQUEST()
+        pos.activationKey = "1VEFF5YUBV39ARIZ"
+
+
+        var data = Activation()
+        data.imei=  ""
+        data.manufacturer = ""
+        data.ip = "0.0.0"
+        data.posWsRequest = pos
 
 //        subscription = api.activation(Activation.REQUEST(data))
 //            .subscribe {
-//
-//                val sharedPref = applicationContext.let { SharedPrefStorage(it) }
-//                sharedPref.writeMessage(PosWS.PREF_ACTIVATION,pos.activationKey!!)
+////
+////                val sharedPref = applicationContext.let { SharedPrefStorage(it) }
+////                sharedPref.writeMessage(PosWS.PREF_ACTIVATION,pos.activationKey!!)
 //
 //            }
 
@@ -64,7 +65,9 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //            }
 
         btn_connect.setOnClickListener {
-            XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+
+            XPayLink.INSTANCE.startDevice(ActionType.ACTIVATION)
+//            XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
         }
     }
 
