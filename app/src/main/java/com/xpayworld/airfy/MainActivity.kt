@@ -7,7 +7,6 @@ import com.xpayworld.payment.network.PosWS
 import com.xpayworld.sdk.payment.*
 import com.xpayworld.sdk.payment.network.RetrofitClient
 import com.xpayworld.sdk.payment.network.payload.Activation
-import com.xpayworld.sdk.payment.network.payload.Login
 import io.reactivex.disposables.Disposable
 
 import kotlinx.android.synthetic.main.activity_main.*
@@ -65,8 +64,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //            }
 
         btn_connect.setOnClickListener {
-
-            XPayLink.INSTANCE.startDevice(ActionType.ACTIVATION)
+            XPayLink.INSTANCE.startAction(ActionType.PIN)
 //            XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
         }
     }

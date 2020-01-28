@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField "String", "API_HOST", '"https://mondepay.com/gateway/POSWebserviceJSON.svc/"'
+            buildConfigField "String", "API_HOST", '"http://mondepay.com/gateway/POSWebserviceJSON.svc/"'
         }
         release {
             buildConfigField "String", "API_HOST", ""

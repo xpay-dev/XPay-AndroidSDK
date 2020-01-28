@@ -1,12 +1,8 @@
 package com.xpayworld.sdk.payment
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.content.DialogInterface
-import android.widget.EditText
-import android.widget.LinearLayout
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
@@ -15,8 +11,9 @@ import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.network.RetrofitClient
 import com.xpayworld.sdk.payment.network.payload.Activation
 import com.xpayworld.sdk.payment.network.payload.Login
-import com.xpayworld.sdk.payment.network.utils.ProgressDialog
-import com.xpayworld.sdk.payment.network.utils.Response
+import com.xpayworld.sdk.payment.utils.PopupDialog
+import com.xpayworld.sdk.payment.utils.ProgressDialog
+import com.xpayworld.sdk.payment.utils.Response
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
@@ -35,6 +32,7 @@ sealed class ActionType {
     object PRINTER : ActionType()
     object REFUND : ActionType()
     object ACTIVATION : ActionType()
+    object PIN: ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -113,7 +111,7 @@ class XPayLink {
      *                          `BLUETOOTH` and `SERIAL`
      * @param cardMode           BBDeviceController.CheckCardMode
      */
-    fun startDevice(type: ActionType) {
+    fun startAction(type: ActionType) {
         mActionType = type
         when (type) {
             is ActionType.SALE -> {
@@ -125,7 +123,7 @@ class XPayLink {
                         Response.ACTIVATION_FAILED.value,
                         Response.ACTIVATION_FAILED.name
                     )
-                    return@startDevice
+                    return@startAction
                 }
 
                 if (!hasEnteredPin()) {
@@ -133,7 +131,7 @@ class XPayLink {
                         Response.ENTER_PIN_FAILED.value,
                         Response.ENTER_PIN_FAILED.name
                     )
-                    return@startDevice
+                    return@startAction
                 }
 
 
@@ -154,8 +152,13 @@ class XPayLink {
             is ActionType.REFUND -> {
 
             }
+
             is ActionType.ACTIVATION -> {
-                startActivation()
+                showActivation()
+            }
+
+            is ActionType.PIN -> {
+                showEnterPin()
             }
 
         }
@@ -179,57 +182,110 @@ class XPayLink {
     }
 
 
-    private fun startActivation() {
-
-        val input = EditText(CONTEXT)
-        val lp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.MATCH_PARENT
-        )
-        input.layoutParams = lp
-
-        var alertDialog: AlertDialog? = null
-        val builder = AlertDialog.Builder(CONTEXT)
-        builder.setTitle("Enter Activation")
-        builder.setNegativeButton(
-            "Cancel",
-            DialogInterface.OnClickListener { dialogInterface: DialogInterface, i: Int ->
-                alertDialog?.dismiss()
-
-            })
-        builder.setPositiveButton(
-            "Activate",
-            DialogInterface.OnClickListener { dialogInterface: DialogInterface, i: Int ->
-                alertDialog?.dismiss()
-                println(input.text)
-
-                var pos = PosWS.REQUEST()
-                pos.activationKey = input.text.toString()
-                var data = Activation()
-                data.imei = ""
-                data.manufacturer = ""
-                data.ip = "0.0.0"
-                data.posWsRequest = pos
-                val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
-
-                subscription = api.activation(Activation.REQUEST(data))
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(
-                        { result ->
-
-                        },
-                        { error ->
-                            println(error.message)
-                        }
-                    )
-            })
-
-        alertDialog = builder.create()
-        alertDialog?.setView(input)
-        alertDialog.show()
+    private fun showActivation() {
+        val dialog = PopupDialog()
+        dialog.buttonNegative = "Cancel"
+        dialog.buttonPositive = "Activate"
+        dialog.title = "Enter Activation"
+        dialog.hasEditText = true
+        dialog.show(callback = { buttonId ->
+            if (buttonId == 1) {
+                callActivationAPI(dialog.text!!)
+            }
+        })
     }
 
+    private fun callActivationAPI(activationPhrase: String) {
+        var pos = PosWS.REQUEST()
+        pos.activationKey = activationPhrase
+        var data = Activation()
+        data.imei = ""
+        data.manufacturer = ""
+        data.ip = "0.0.0"
+        data.posWsRequest = pos
+        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
+        ProgressDialog.INSTANCE.attach(CONTEXT)
+        ProgressDialog.INSTANCE.message("Loading...")
+        ProgressDialog.INSTANCE.show()
+        subscription = api.activation(Activation.REQUEST(data))
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                { result ->
+                    ProgressDialog.INSTANCE.dismiss()
+                    val result = result.body()?.data
+                    if (result?.errNumber != 0.0) {
+                        mListener?.onError(
+                            Response.ACTIVATION_FAILED.value,
+                            Response.ACTIVATION_FAILED.name
+                        )
+                        return@subscribe
+                    }
+                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
+                    subscription.dispose()
+                    showEnterPin()
+                },
+                { error ->
+                    ProgressDialog.INSTANCE.dismiss()
+                    mListener?.onError(
+                        Response.ACTIVATION_FAILED.value,
+                        Response.ACTIVATION_FAILED.name
+                    )
+                    println(error.message)
+                    subscription.dispose()
+                }
+            )
+    }
+
+    private fun showEnterPin() {
+
+        val dialog = PopupDialog()
+        dialog.buttonNegative = "Cancel"
+        dialog.buttonPositive = "Ok"
+        dialog.title = "Enter Pin code"
+        dialog.hasEditText = true
+        dialog.show(callback = { buttonId ->
+            if (buttonId == 1) {
+                callLoginAPI(dialog.text!!)
+            }
+        })
+    }
+
+    private fun callLoginAPI(pinCode: String){
+
+        var data = Login()
+        data.pin = pinCode
+
+        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
+        ProgressDialog.INSTANCE.attach(CONTEXT)
+        ProgressDialog.INSTANCE.message("Loading...")
+        ProgressDialog.INSTANCE.show()
+
+        subscription = api.login(Login.REQUEST(data)).subscribe(
+            { result ->
+                ProgressDialog.INSTANCE.dismiss()
+                val result = result.body()?.data
+                if (result?.errNumber != 0.0) {
+                    mListener?.onError(
+                        Response.ACTIVATION_FAILED.value,
+                        Response.ACTIVATION_FAILED.name
+                    )
+                    return@subscribe
+                }
+                SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
+                subscription.dispose()
+            },
+            { error ->
+                ProgressDialog.INSTANCE.dismiss()
+                mListener?.onError(
+                    Response.ENTER_PIN_FAILED.value,
+                    Response.ENTER_PIN_FAILED.name
+                )
+                println(error.message)
+                subscription.dispose()
+            }
+        )
+    }
 
     @SuppressLint("SimpleDateFormat")
     private fun startEMV() {
