@@ -6,8 +6,20 @@ import android.content.Context
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
+import com.xpayworld.payment.network.PosWS
+import com.xpayworld.payment.util.SharedPref
+import com.xpayworld.sdk.payment.network.RetrofitClient
+import com.xpayworld.sdk.payment.network.payload.Activation
+import com.xpayworld.sdk.payment.network.payload.Login
+import com.xpayworld.sdk.payment.utils.PopupDialog
+import com.xpayworld.sdk.payment.utils.ProgressDialog
+import com.xpayworld.sdk.payment.utils.Response
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.Disposable
+import io.reactivex.schedulers.Schedulers
 import java.text.SimpleDateFormat
 import java.util.*
+
 
 enum class Connection {
     SERIAL, BLUETOOTH
@@ -15,8 +27,12 @@ enum class Connection {
 
 sealed class ActionType {
     // for transaction
-    data class SALE(var saleData: SaleData) : ActionType()
+    data class SALE(var sale: Sale) : ActionType()
+
     object PRINTER : ActionType()
+    object REFUND : ActionType()
+    object ACTIVATION : ActionType()
+    object PIN: ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -29,21 +45,27 @@ enum class CardMode(val value: Int) {
     INSERT_OR_TAP(6),
 }
 
-class SaleData {
+class Sale {
     var amount: Int? = null
     var currency: String? = null
     var currencyCode: Int? = null
     var orderId: String? = null
     var connection: Connection? = null
     var cardMode: CardMode? = null
+    var isOffile: Boolean? = false
+    var timeOut: Int? = 60
 }
 
 
 interface PaymentServiceListener {
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
+
+    fun onTransactionResult(result: Int?, message: String?)
+    fun onError(error: Int?, message: String?)
 }
 
-class PaymentService(private val mContext: Context, listener: PaymentServiceListener) {
+@Suppress("INCOMPATIBLE_ENUM_COMPARISON")
+class XPayLink {
 
     private val CARD_MODE: BBDeviceController.CheckCardMode? = null
     private val DEVICE_NAMES = arrayOf("WP")
@@ -52,17 +74,34 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     private var mDeviceListener: BBPOSDeviceListener? = null
     private var mSelectedDevice: BluetoothDevice? = null
 
-    private var mSale: SaleData? = null
+    private var mSale: Sale? = null
     private var mActionType: ActionType? = null
+    private var mListener: PaymentServiceListener? = null
+
+    private lateinit var subscription: Disposable
 
     init {
-        mDeviceListener = BBPOSDeviceListener(listener)
+        INSTANCE = this
+    }
+
+    companion object {
+        fun valueOf(value: Int): BBDeviceController.CheckCardMode? =
+            BBDeviceController.CheckCardMode.values().find { it.value == value }
+
+        lateinit var CONTEXT: Context
+        var INSTANCE: XPayLink = XPayLink()
+    }
+
+    fun attach(mContext: Context, listener: PaymentServiceListener) {
+        CONTEXT = mContext
+        mListener = listener
+        mDeviceListener = BBPOSDeviceListener()
         mBBDeviceController = BBDeviceController.getInstance(mContext, mDeviceListener)
         BBDeviceController.setDebugLogEnabled(true)
     }
 
     /**
-     * Payment Service Configuration
+     * Start Device
      *
      * @param type             Integer   eg. 1,0023.40 = 1002340
      * @param currency       String   eg. PHP = Philippine Peso
@@ -72,18 +111,36 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
      *                          `BLUETOOTH` and `SERIAL`
      * @param cardMode           BBDeviceController.CheckCardMode
      */
-    fun startDevice(type: ActionType) {
+    fun startAction(type: ActionType) {
         mActionType = type
         when (type) {
             is ActionType.SALE -> {
 
-                mSale = type.saleData
+                mSale = type.sale
+
+                if (!isActivated()) {
+                    mListener?.onError(
+                        Response.ACTIVATION_FAILED.value,
+                        Response.ACTIVATION_FAILED.name
+                    )
+                    return@startAction
+                }
+
+                if (!hasEnteredPin()) {
+                    mListener?.onError(
+                        Response.ENTER_PIN_FAILED.value,
+                        Response.ENTER_PIN_FAILED.name
+                    )
+                    return@startAction
+                }
+
 
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
 
                     }
                     Connection.BLUETOOTH -> {
+                        ProgressDialog.INSTANCE.attach(CONTEXT)
                         mBBDeviceController?.startBTScan(DEVICE_NAMES, 120)
                     }
                 }
@@ -91,6 +148,19 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
             is ActionType.PRINTER -> {
 
             }
+
+            is ActionType.REFUND -> {
+
+            }
+
+            is ActionType.ACTIVATION -> {
+                showActivation()
+            }
+
+            is ActionType.PIN -> {
+                showEnterPin()
+            }
+
         }
     }
 
@@ -103,9 +173,123 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         mBBDeviceController?.connectBT(device)
     }
 
+    private fun isActivated(): Boolean {
+        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
+    }
+
+    private fun hasEnteredPin(): Boolean {
+        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
+    }
+
+
+    private fun showActivation() {
+        val dialog = PopupDialog()
+        dialog.buttonNegative = "Cancel"
+        dialog.buttonPositive = "Activate"
+        dialog.title = "Enter Activation"
+        dialog.hasEditText = true
+        dialog.show(callback = { buttonId ->
+            if (buttonId == 1) {
+                callActivationAPI(dialog.text!!)
+            }
+        })
+    }
+
+    private fun callActivationAPI(activationPhrase: String) {
+        var pos = PosWS.REQUEST()
+        pos.activationKey = activationPhrase
+        var data = Activation()
+        data.imei = ""
+        data.manufacturer = ""
+        data.ip = "0.0.0"
+        data.posWsRequest = pos
+        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
+        ProgressDialog.INSTANCE.attach(CONTEXT)
+        ProgressDialog.INSTANCE.message("Loading...")
+        ProgressDialog.INSTANCE.show()
+        subscription = api.activation(Activation.REQUEST(data))
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                { result ->
+                    ProgressDialog.INSTANCE.dismiss()
+                    val result = result.body()?.data
+                    if (result?.errNumber != 0.0) {
+                        mListener?.onError(
+                            Response.ACTIVATION_FAILED.value,
+                            Response.ACTIVATION_FAILED.name
+                        )
+                        return@subscribe
+                    }
+                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
+                    subscription.dispose()
+                    showEnterPin()
+                },
+                { error ->
+                    ProgressDialog.INSTANCE.dismiss()
+                    mListener?.onError(
+                        Response.ACTIVATION_FAILED.value,
+                        Response.ACTIVATION_FAILED.name
+                    )
+                    println(error.message)
+                    subscription.dispose()
+                }
+            )
+    }
+
+    private fun showEnterPin() {
+
+        val dialog = PopupDialog()
+        dialog.buttonNegative = "Cancel"
+        dialog.buttonPositive = "Ok"
+        dialog.title = "Enter Pin code"
+        dialog.hasEditText = true
+        dialog.show(callback = { buttonId ->
+            if (buttonId == 1) {
+                callLoginAPI(dialog.text!!)
+            }
+        })
+    }
+
+    private fun callLoginAPI(pinCode: String){
+
+        var data = Login()
+        data.pin = pinCode
+
+        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
+        ProgressDialog.INSTANCE.attach(CONTEXT)
+        ProgressDialog.INSTANCE.message("Loading...")
+        ProgressDialog.INSTANCE.show()
+
+        subscription = api.login(Login.REQUEST(data)).subscribe(
+            { result ->
+                ProgressDialog.INSTANCE.dismiss()
+                val result = result.body()?.data
+                if (result?.errNumber != 0.0) {
+                    mListener?.onError(
+                        Response.ACTIVATION_FAILED.value,
+                        Response.ACTIVATION_FAILED.name
+                    )
+                    return@subscribe
+                }
+                SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
+                subscription.dispose()
+            },
+            { error ->
+                ProgressDialog.INSTANCE.dismiss()
+                mListener?.onError(
+                    Response.ENTER_PIN_FAILED.value,
+                    Response.ENTER_PIN_FAILED.name
+                )
+                println(error.message)
+                subscription.dispose()
+            }
+        )
+    }
 
     @SuppressLint("SimpleDateFormat")
     private fun startEMV() {
+        ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
         data["emvOption"] = BBDeviceController.EmvOption.START
         data["orderID"] = "${mSale?.orderId}"
@@ -118,14 +302,18 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
     }
 
     private fun setAmount() {
-        val input: Hashtable<String, Any> = Hashtable() //define empty hashmap
+        ProgressDialog.INSTANCE.show()
+        ProgressDialog.INSTANCE.message("CONFIRM AMOUNT")
 
+        val input: Hashtable<String, Any> = Hashtable() //define empty hashmap
         // Currency Sign
         val currencyCharacter = arrayOf(
             CurrencyCharacter.P,
             CurrencyCharacter.H,
             CurrencyCharacter.P
         )
+
+        println(currencyCharacter[0].value)
 
         // Configure Amount
         input.put("amount", "${mSale?.amount}")
@@ -139,12 +327,8 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         mBBDeviceController?.setAmount(input)
     }
 
-    companion object {
-        fun valueOf(value: Int): BBDeviceController.CheckCardMode? =
-            BBDeviceController.CheckCardMode.values().find { it.value == value }
-    }
 
-    private inner class BBPOSDeviceListener(private val listener: PaymentServiceListener) :
+    private inner class BBPOSDeviceListener :
         BBDeviceController.BBDeviceControllerListener {
 
         override fun onReturnUpdateAIDResult(p0: Hashtable<String, BBDeviceController.TerminalSettingStatus>?) {
@@ -167,10 +351,12 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         }
 
         override fun onRequestSelectApplication(p0: ArrayList<String>?) {
+            mBBDeviceController?.selectApplication(0)
 
         }
 
         override fun onRequestDisplayText(p0: BBDeviceController.DisplayText?) {
+            ProgressDialog.INSTANCE.message(p0.toString())
 
         }
 
@@ -215,6 +401,8 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
 
         override fun onRequestOnlineProcess(p0: String?) {
 
+            mBBDeviceController?.sendOnlineProcessResult("8A023030")
+            //8A023030
         }
 
         override fun onReturnNfcDataExchangeResult(p0: Boolean, p1: Hashtable<String, String>?) {
@@ -277,8 +465,9 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
 
         }
 
-        override fun onReturnTransactionResult(p0: BBDeviceController.TransactionResult?) {
-
+        override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
+            mListener?.onTransactionResult(result?.ordinal, result?.name)
+            ProgressDialog.INSTANCE.dismiss()
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {
@@ -308,7 +497,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         }
 
         override fun onBTReturnScanResults(devices: MutableList<BluetoothDevice>?) {
-            listener.onBluetoothScanResult(devices)
+            mListener?.onBluetoothScanResult(devices)
         }
 
         override fun onEnterStandbyMode() {
@@ -415,7 +604,7 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         }
 
         override fun onRequestFinalConfirm() {
-
+            mBBDeviceController?.sendFinalConfirmResult(true)
         }
 
         override fun onReturnBarcode(p0: String?) {
@@ -490,7 +679,28 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
         }
 
         override fun onWaitingForCard(p0: BBDeviceController.CheckCardMode?) {
-
+            var resp = ""
+            when (mSale?.cardMode?.value) {
+                BBDeviceController.CheckCardMode.INSERT.value -> {
+                    resp = "PLEASE INSERT CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE.value -> {
+                    resp = "PLEASE SWIPE CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_INSERT.value -> {
+                    resp = "PLEASE SWIPE/INSERT CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_TAP.value -> {
+                    resp = "PLEASE SWIPE/TAP CARD"
+                }
+                BBDeviceController.CheckCardMode.INSERT_OR_TAP.value -> {
+                    resp = "PLEASE inert/TAP CARD"
+                }
+                BBDeviceController.CheckCardMode.SWIPE_OR_INSERT_OR_TAP.value -> {
+                    resp = "PLEASE SWIPE/INSERT/TAP CARD"
+                }
+            }
+            ProgressDialog.INSTANCE.message(resp)
         }
 
         override fun onReturnCheckCardResult(
@@ -531,8 +741,9 @@ class PaymentService(private val mContext: Context, listener: PaymentServiceList
 
         }
 
-        override fun onError(p0: BBDeviceController.Error?, p1: String?) {
-
+        override fun onError(error: BBDeviceController.Error?, p1: String?) {
+            ProgressDialog.INSTANCE.dismiss()
+            mListener?.onError(error?.ordinal, p1)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {
