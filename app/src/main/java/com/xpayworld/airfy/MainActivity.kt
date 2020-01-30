@@ -22,19 +22,18 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
         XPayLink.INSTANCE.attach(this, this)
 
-//        val saleData = Sale()
-//        saleData.amount = 10000
-//        saleData.connection = Connection.BLUETOOTH
-//        saleData.currencyCode = 608
-//        saleData.currency = "PHP"
-//        saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-//        saleData.orderId = "0123456789ABCDEF0123456789ABCD"
-//        saleData.isOffile = true
+        val saleData = Sale()
+        saleData.amount = 10000
+        saleData.connection = Connection.BLUETOOTH
+        saleData.currencyCode = 608
+        saleData.currency = "PHP"
+        saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
+        saleData.orderId = "0123456789ABCDEF0123456789ABCD"
+        saleData.isOffile = true
 //        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
 
-
-//        service?.startDevice(ActionType.SALE(saleData))
+//      service?.startDevice(ActionType.SALE(saleData))
         val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
 
         var pos = PosWS.REQUEST()
@@ -64,8 +63,9 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //            }
 
         btn_connect.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.PIN)
-//            XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+            XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+
+//          XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
         }
     }
 

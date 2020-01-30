@@ -9,7 +9,7 @@ import com.bbpos.bbdevice.CAPK
 import com.xpayworld.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.network.RetrofitClient
-import com.xpayworld.sdk.payment.network.payload.Activation
+import com.xpayworld.sdk.payment.network.API
 import com.xpayworld.sdk.payment.network.payload.Login
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
@@ -181,7 +181,6 @@ class XPayLink {
         return SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
 
-
     private fun showActivation() {
         val dialog = PopupDialog()
         dialog.buttonNegative = "Cancel"
@@ -190,55 +189,15 @@ class XPayLink {
         dialog.hasEditText = true
         dialog.show(callback = { buttonId ->
             if (buttonId == 1) {
-                callActivationAPI(dialog.text!!)
+                API.INSTANCE.attach(mListener!!)
+                API.INSTANCE.callActivation(dialog.text!!,callback = {
+                    showEnterPin()
+                })
             }
         })
     }
 
-    private fun callActivationAPI(activationPhrase: String) {
-        var pos = PosWS.REQUEST()
-        pos.activationKey = activationPhrase
-        var data = Activation()
-        data.imei = ""
-        data.manufacturer = ""
-        data.ip = "0.0.0"
-        data.posWsRequest = pos
-        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
-        ProgressDialog.INSTANCE.attach(CONTEXT)
-        ProgressDialog.INSTANCE.message("Loading...")
-        ProgressDialog.INSTANCE.show()
-        subscription = api.activation(Activation.REQUEST(data))
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                { result ->
-                    ProgressDialog.INSTANCE.dismiss()
-                    val result = result.body()?.data
-                    if (result?.errNumber != 0.0) {
-                        mListener?.onError(
-                            Response.ACTIVATION_FAILED.value,
-                            Response.ACTIVATION_FAILED.name
-                        )
-                        return@subscribe
-                    }
-                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
-                    subscription.dispose()
-                    showEnterPin()
-                },
-                { error ->
-                    ProgressDialog.INSTANCE.dismiss()
-                    mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
-                    )
-                    println(error.message)
-                    subscription.dispose()
-                }
-            )
-    }
-
     private fun showEnterPin() {
-
         val dialog = PopupDialog()
         dialog.buttonNegative = "Cancel"
         dialog.buttonPositive = "Ok"
@@ -246,45 +205,9 @@ class XPayLink {
         dialog.hasEditText = true
         dialog.show(callback = { buttonId ->
             if (buttonId == 1) {
-                callLoginAPI(dialog.text!!)
+                API.INSTANCE.callLogin(dialog.text!!)
             }
         })
-    }
-
-    private fun callLoginAPI(pinCode: String){
-
-        var data = Login()
-        data.pin = pinCode
-
-        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
-        ProgressDialog.INSTANCE.attach(CONTEXT)
-        ProgressDialog.INSTANCE.message("Loading...")
-        ProgressDialog.INSTANCE.show()
-
-        subscription = api.login(Login.REQUEST(data)).subscribe(
-            { result ->
-                ProgressDialog.INSTANCE.dismiss()
-                val result = result.body()?.data
-                if (result?.errNumber != 0.0) {
-                    mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
-                    )
-                    return@subscribe
-                }
-                SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
-                subscription.dispose()
-            },
-            { error ->
-                ProgressDialog.INSTANCE.dismiss()
-                mListener?.onError(
-                    Response.ENTER_PIN_FAILED.value,
-                    Response.ENTER_PIN_FAILED.name
-                )
-                println(error.message)
-                subscription.dispose()
-            }
-        )
     }
 
     @SuppressLint("SimpleDateFormat")
