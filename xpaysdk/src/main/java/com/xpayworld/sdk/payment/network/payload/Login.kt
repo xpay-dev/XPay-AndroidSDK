@@ -1,7 +1,7 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.APIConstant
+import com.xpayworld.payment.network.Constant
 import com.xpayworld.payment.network.PosWS
 
 import com.xpayworld.payment.util.SharedPref
@@ -47,9 +47,9 @@ class Login {
 
     interface API {
         @Headers(
-            APIConstant.Charset,
-            APIConstant.Content)
-        @POST(APIConstant.Login)
+            Constant.Charset,
+            Constant.Content)
+        @POST(Constant.Login)
         fun login(@Body login: REQUEST) : Observable<Response<RESULT>>
     }
 }

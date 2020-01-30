@@ -8,15 +8,11 @@ import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
 import com.xpayworld.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
-import com.xpayworld.sdk.payment.network.RetrofitClient
 import com.xpayworld.sdk.payment.network.API
-import com.xpayworld.sdk.payment.network.payload.Login
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
 import com.xpayworld.sdk.payment.utils.Response
-import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
-import io.reactivex.schedulers.Schedulers
 import java.text.SimpleDateFormat
 import java.util.*
 

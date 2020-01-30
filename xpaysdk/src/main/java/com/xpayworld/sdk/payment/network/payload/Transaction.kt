@@ -1,16 +1,15 @@
 package com.xpayworld.sdk.payment.network.transaction
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.APIConstant
+import com.xpayworld.payment.network.Constant
 import com.xpayworld.payment.network.PosWS
 import com.xpayworld.sdk.payment.network.TransactionResult
-import com.xpayworld.sdk.payment.network.payload.transaction.PurchaseInfo
+import com.xpayworld.sdk.payment.data.Purchase
 import io.reactivex.Single
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Headers
 import retrofit2.http.POST
-import java.util.*
 
 
 class Transaction {
@@ -58,7 +57,7 @@ class Transaction {
         var INSTANCE : Transaction = Transaction()
     }
 
-    fun attach(data : PurchaseInfo) {
+    fun attach(data : Purchase) {
         val card = CardDetails()
         card.amount = data.amount
         card.currency = data.currency
@@ -72,6 +71,7 @@ class Transaction {
         card.merchantOrderId = data.orderId
         card.track2 = data.card?.encTrack2 ?: ""
         card.refNumberApp = posWsRequest!!.activationKey +""+ System.currentTimeMillis()
+        cardInfo = card
     }
 
     init {
@@ -136,15 +136,15 @@ class Transaction {
 
     interface API {
         @Headers(
-            APIConstant.Charset,
-            APIConstant.Content)
-        @POST(APIConstant.TransCreditEMV)
+            Constant.API.CHARSET,
+            Constant.API.CONTENT)
+        @POST(Constant.API.TRANS_CREDIT_EMV)
         fun EMV(@Body data: REQUEST) : Single<Response<TransactionResult>>
 
         @Headers(
-            APIConstant.Charset,
-            APIConstant.Content)
-        @POST(APIConstant.TransCreditSWIPE)
+            Constant.API.CHARSET,
+            Constant.API.CONTENT)
+        @POST(Constant.API.TRANS_CREDIT_SWIPE)
         fun SWIPE(@Body  data: REQUEST) : Single<Response<TransactionResult>>
 
     }

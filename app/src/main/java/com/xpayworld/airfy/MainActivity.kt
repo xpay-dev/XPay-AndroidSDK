@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //
 //            }
 
+
         btn_connect.setOnClickListener {
             XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
 
