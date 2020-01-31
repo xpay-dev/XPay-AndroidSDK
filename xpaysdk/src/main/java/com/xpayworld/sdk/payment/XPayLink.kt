@@ -3,16 +3,20 @@ package com.xpayworld.sdk.payment
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.net.ConnectivityManager
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
+import com.xpayworld.sdk.payment.data.Card
+import com.xpayworld.sdk.payment.data.XPayDatabase
+import com.xpayworld.sdk.payment.data.Transaction
+import com.xpayworld.sdk.payment.data.TransactionRepository
 import com.xpayworld.sdk.payment.network.API
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.Response
-import io.reactivex.disposables.Disposable
+import com.xpayworld.sdk.payment.utils.XPayResponse
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,6 +33,7 @@ sealed class ActionType {
     object REFUND : ActionType()
     object ACTIVATION : ActionType()
     object PIN: ActionType()
+    object BATCH_UPLOAD: ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -42,22 +47,23 @@ enum class CardMode(val value: Int) {
 }
 
 class Sale {
-    var amount: Int? = null
-    var currency: String? = null
-    var currencyCode: Int? = null
-    var orderId: String? = null
+    var amount: Int = 0
+    var currency: String = ""
+    var currencyCode: Int = 0
+    var orderId: String = ""
     var connection: Connection? = null
     var cardMode: CardMode? = null
-    var isOffile: Boolean? = false
+    var isOffline: Boolean = false
     var timeOut: Int? = 60
 }
 
 
 interface PaymentServiceListener {
-    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
 
+    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
     fun onTransactionResult(result: Int?, message: String?)
     fun onError(error: Int?, message: String?)
+
 }
 
 @Suppress("INCOMPATIBLE_ENUM_COMPARISON")
@@ -73,8 +79,7 @@ class XPayLink {
     private var mSale: Sale? = null
     private var mActionType: ActionType? = null
     private var mListener: PaymentServiceListener? = null
-
-    private lateinit var subscription: Disposable
+    private var mCard = Card()
 
     init {
         INSTANCE = this
@@ -116,20 +121,19 @@ class XPayLink {
 
                 if (!isActivated()) {
                     mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
+                        XPayResponse.ACTIVATION_FAILED.value,
+                        XPayResponse.ACTIVATION_FAILED.name
                     )
                     return@startAction
                 }
 
                 if (!hasEnteredPin()) {
                     mListener?.onError(
-                        Response.ENTER_PIN_FAILED.value,
-                        Response.ENTER_PIN_FAILED.name
+                        XPayResponse.ENTER_PIN_FAILED.value,
+                        XPayResponse.ENTER_PIN_FAILED.name
                     )
                     return@startAction
                 }
-
 
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
@@ -157,6 +161,9 @@ class XPayLink {
                 showEnterPin()
             }
 
+            is ActionType.BATCH_UPLOAD -> {
+                uploadTransaction()
+            }
         }
     }
 
@@ -167,6 +174,23 @@ class XPayLink {
     fun setBTConnection(device: BluetoothDevice) {
         mSelectedDevice = device
         mBBDeviceController?.connectBT(device)
+    }
+
+    private fun uploadTransaction(){
+        if (isNetworkAvailable()){
+            mListener?.onError(
+                XPayResponse.BATCH_NETWORK_FAILED.value,
+                XPayResponse.BATCH_NETWORK_FAILED.name
+            )
+            return@uploadTransaction
+        }
+
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = CONTEXT.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+        val activeNetworkInfo = connectivityManager!!.activeNetworkInfo
+        return activeNetworkInfo != null
     }
 
     private fun isActivated(): Boolean {
@@ -204,6 +228,37 @@ class XPayLink {
                 API.INSTANCE.callLogin(dialog.text!!)
             }
         })
+    }
+
+    private fun insertTransaction(): Int{
+        var trans =   Transaction()
+        trans.amount =  mSale!!.amount.div(100.0)
+        trans.currency = mSale!!.currency
+        trans.orderId = mSale!!.orderId
+        trans.isOffline = mSale!!.isOffline
+        trans.card = mCard
+        trans.timestamp = System.currentTimeMillis()
+
+        // Check if the card is already expired
+        val cardExpiry = mCard.expiryDate
+        val cardYear = "20${cardExpiry.substring(0..2)}".toInt()
+        val cardMonth = cardExpiry.substring(2..4).toInt()
+
+        val calendar: Calendar = Calendar.getInstance()
+        val year: Int = calendar.get(Calendar.YEAR)
+        val month: Int = calendar.get(Calendar.MONTH)
+
+        if ((cardYear <= year) && cardMonth < month){
+            mListener?.onError(
+                XPayResponse.CARD_EXPIRED.value,
+                XPayResponse.CARD_EXPIRED.name
+            )
+            return XPayResponse.CARD_EXPIRED.value
+        }
+
+        TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()).createTransaction(trans)
+        return 0
     }
 
     @SuppressLint("SimpleDateFormat")
@@ -271,12 +326,10 @@ class XPayLink {
 
         override fun onRequestSelectApplication(p0: ArrayList<String>?) {
             mBBDeviceController?.selectApplication(0)
-
         }
 
         override fun onRequestDisplayText(p0: BBDeviceController.DisplayText?) {
             ProgressDialog.INSTANCE.message(p0.toString())
-
         }
 
         override fun onReturnPrintResult(p0: BBDeviceController.PrintResult?) {
@@ -318,8 +371,18 @@ class XPayLink {
 
         }
 
-        override fun onRequestOnlineProcess(p0: String?) {
+        override fun onRequestOnlineProcess(tlv: String?) {
+            val decodeData = BBDeviceController.decodeTlv(tlv)
+            mCard.emvICCData =  decodeData["C2"].toString()
+            mCard.expiryDate =  decodeData["5F24"].toString()
+            mCard.ksn = decodeData["C0"].toString()
+            mCard.cardNumber = decodeData["5A"].toString()
+            mCard.cardXNumber = decodeData["C4"].toString()
 
+           if (insertTransaction() != 0 && mSale?.isOffline == true) {
+               mBBDeviceController?.sendOnlineProcessResult("8A023035")
+               return
+           }
             mBBDeviceController?.sendOnlineProcessResult("8A023030")
             //8A023030
         }
@@ -623,9 +686,32 @@ class XPayLink {
         }
 
         override fun onReturnCheckCardResult(
-            p0: BBDeviceController.CheckCardResult?,
-            p1: Hashtable<String, String>?
+            checkCardResult: BBDeviceController.CheckCardResult?,
+            decodeData: Hashtable<String, String>
         ) {
+
+            if(checkCardResult == BBDeviceController.CheckCardResult.MSR) {
+
+                var expiryDate = decodeData["expiryDate"].toString()
+
+                mCard.ksn = decodeData["ksn"].toString()
+                mCard.cardNumber = decodeData["pan"].toString()
+                mCard.cardXNumber = decodeData["maskedPAN"].toString()
+                mCard.expiryDate =  expiryDate
+                mCard.expiryYear = expiryDate.substring(0..2)
+                mCard.expiryMonth = expiryDate.substring(2..4)
+                mCard.encTrack2 = decodeData["encTrack2"].toString()
+                mCard.serviceCode = decodeData["serviceCode"].toString()
+                mCard.posEntry = decodeData["posEntryMode"]!!.toInt()
+//                mCard.card = cardData
+//                proceedTransaction.value = true
+
+
+            } else if(checkCardResult == BBDeviceController.CheckCardResult.INSERTED_CARD){
+
+            } else if (checkCardResult == BBDeviceController.CheckCardResult.TAP_CARD_DETECTED){
+
+            }
 
         }
 

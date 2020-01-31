@@ -1,10 +1,10 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.Constant
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
 
 import com.xpayworld.payment.util.SharedPref
+import com.xpayworld.sdk.payment.network.Constant
 import io.reactivex.Observable
 import retrofit2.Response
 import retrofit2.http.Body
@@ -47,9 +47,9 @@ class Login {
 
     interface API {
         @Headers(
-            Constant.Charset,
-            Constant.Content)
-        @POST(Constant.Login)
+            Constant.API.CHARSET,
+            Constant.API.CONTENT)
+        @POST(Constant.API.PIN_LOGIN)
         fun login(@Body login: REQUEST) : Observable<Response<RESULT>>
     }
 }

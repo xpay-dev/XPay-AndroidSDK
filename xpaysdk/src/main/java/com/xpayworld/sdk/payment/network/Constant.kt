@@ -1,5 +1,4 @@
-package com.xpayworld.payment.network
-
+package com.xpayworld.sdk.payment.network
 //GLOBAL HEADERS
 
 class Constant {
@@ -21,7 +20,7 @@ class Constant {
             // http://13.250.116.190:95/POSWebserviceJSON.svc
             const val EmailReceipt = "EmailReceipt"
             const val ForgotMobilePin = "ForgotMobilePin"
-            const val Login = "loginpin"
+            const val PIN_LOGIN = "loginpin"
             const val Registration = "Registration"
             const val CreateTicket = "CreateTicket"
 

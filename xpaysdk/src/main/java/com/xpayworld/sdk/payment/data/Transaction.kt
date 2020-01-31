@@ -1,12 +1,12 @@
 package com.xpayworld.sdk.payment.data
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.xpayworld.payment.data.Card
 
 @Entity
-data class Purchase(
+data class Transaction(
     var amount: Double = 0.0,
     var currencyCode: String = "",
     var currency: String = "",
@@ -22,6 +22,7 @@ data class Purchase(
     var timestamp : Long = 0L,
     var cardCaptureMethod: Int = 0,
     var device : Int = 0,
+    @Embedded
     var card : Card? = null
 )
 {

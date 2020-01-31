@@ -1,4 +1,4 @@
-package com.xpayworld.payment.data
+package com.xpayworld.sdk.payment.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity

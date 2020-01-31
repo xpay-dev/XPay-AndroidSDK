@@ -1,10 +1,11 @@
-package com.xpayworld.sdk.payment.network.transaction
+package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.Constant
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.network.TransactionResult
-import com.xpayworld.sdk.payment.data.Purchase
+import com.xpayworld.sdk.payment.data.Transaction
+import com.xpayworld.sdk.payment.network.Constant
+import io.reactivex.Observable
 import io.reactivex.Single
 import retrofit2.Response
 import retrofit2.http.Body
@@ -12,7 +13,7 @@ import retrofit2.http.Headers
 import retrofit2.http.POST
 
 
-class Transaction {
+class PurchaseTransaction {
 
     @SerializedName("AccountTypeId")
     var accountType: Int? = AccountType.NONE.ordinal
@@ -54,10 +55,10 @@ class Transaction {
     var cardInfo: CardDetails? = null
 
     companion object{
-        var INSTANCE : Transaction = Transaction()
+        var INSTANCE : PurchaseTransaction = PurchaseTransaction()
     }
 
-    fun attach(data : Purchase) {
+    fun attach(data : Transaction) {
         val card = CardDetails()
         card.amount = data.amount
         card.currency = data.currency
@@ -129,7 +130,7 @@ class Transaction {
 
     }
 
-    class REQUEST(data: Transaction) {
+    class REQUEST(data: PurchaseTransaction) {
         @SerializedName("request")
         var request  = data
     }
@@ -139,13 +140,13 @@ class Transaction {
             Constant.API.CHARSET,
             Constant.API.CONTENT)
         @POST(Constant.API.TRANS_CREDIT_EMV)
-        fun EMV(@Body data: REQUEST) : Single<Response<TransactionResult>>
+        fun EMV(@Body data: REQUEST) : Observable<Response<TransactionResult>>
 
         @Headers(
             Constant.API.CHARSET,
             Constant.API.CONTENT)
         @POST(Constant.API.TRANS_CREDIT_SWIPE)
-        fun SWIPE(@Body  data: REQUEST) : Single<Response<TransactionResult>>
+        fun SWIPE(@Body  data: REQUEST) : Observable<Response<TransactionResult>>
 
     }
 

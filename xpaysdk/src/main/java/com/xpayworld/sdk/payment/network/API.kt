@@ -1,21 +1,28 @@
 package com.xpayworld.sdk.payment.network
 
-import com.xpayworld.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.PaymentServiceListener
 import com.xpayworld.sdk.payment.XPayLink
+import com.xpayworld.sdk.payment.data.Transaction
 import com.xpayworld.sdk.payment.network.payload.Activation
 import com.xpayworld.sdk.payment.network.payload.Login
+import com.xpayworld.sdk.payment.network.payload.PurchaseTransaction
 import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.Response
+import com.xpayworld.sdk.payment.utils.XPayResponse
+
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
+import io.reactivex.Observable
+import retrofit2.Response
+import java.util.*
 
 class API {
 
     private var mListener: PaymentServiceListener? = null
     private lateinit var subscription: Disposable
+
+    private val mClient = RetrofitClient().getRetrofit()
 
     init {
         INSTANCE = this
@@ -40,20 +47,20 @@ class API {
         data.manufacturer = ""
         data.ip = "0.0.0"
         data.posWsRequest = pos
-        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
+        val api = mClient.create(Activation.API::class.java)
         subscription = api.activation(Activation.REQUEST(data))
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
-            .doOnSubscribe { ProgressDialog.INSTANCE.show()}
-            .doAfterTerminate { ProgressDialog.INSTANCE.dismiss()}
+            .doOnSubscribe { ProgressDialog.INSTANCE.show() }
+            .doAfterTerminate { ProgressDialog.INSTANCE.dismiss() }
             .subscribe(
                 { result ->
                     ProgressDialog.INSTANCE.dismiss()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
-                            Response.ACTIVATION_FAILED.value,
-                            Response.ACTIVATION_FAILED.name
+                            XPayResponse.ACTIVATION_FAILED.value,
+                            XPayResponse.ACTIVATION_FAILED.name
                         )
                         return@subscribe
                     }
@@ -63,8 +70,8 @@ class API {
                 },
                 { error ->
                     mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
+                        XPayResponse.ACTIVATION_FAILED.value,
+                        XPayResponse.ACTIVATION_FAILED.name
                     )
                     println(error.message)
                     subscription.dispose()
@@ -77,7 +84,7 @@ class API {
         var data = Login()
         data.pin = pinCode
 
-        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
+        val api = mClient.create(Login.API::class.java)
         subscription = api.login(Login.REQUEST(data))
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
@@ -89,8 +96,8 @@ class API {
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
-                            Response.ENTER_PIN_FAILED.value,
-                            Response.ENTER_PIN_FAILED.name
+                            XPayResponse.ENTER_PIN_FAILED.value,
+                            XPayResponse.ENTER_PIN_FAILED.name
                         )
                         return@subscribe
                     }
@@ -99,8 +106,8 @@ class API {
                 },
                 { error ->
                     mListener?.onError(
-                        Response.ENTER_PIN_FAILED.value,
-                        Response.ENTER_PIN_FAILED.name
+                        XPayResponse.ENTER_PIN_FAILED.value,
+                        XPayResponse.ENTER_PIN_FAILED.name
                     )
                     println(error.message)
                     subscription.dispose()
@@ -108,8 +115,30 @@ class API {
             )
     }
 
-    fun callTransaction(){
+    fun callTransaction() {
+        val txn = Transaction()
+        val data = PurchaseTransaction()
+        var resultTxn: Observable<Response<TransactionResult>>? = null
+        val api = mClient.create(PurchaseTransaction.API::class.java)
+        resultTxn = if (txn.card?.serviceCode != "") {
+            api.SWIPE(PurchaseTransaction.REQUEST(data))
+        } else {
+            api.EMV(PurchaseTransaction.REQUEST(data))
+        }
+
+        subscription = resultTxn.subscribe(
+            { result ->
+
+            },
+            { error ->
+                mListener?.onError(
+                    XPayResponse.TXN_NETWORK_FAILED.value,
+                    XPayResponse.TXN_NETWORK_FAILED.name
+                )
+                println(error.message)
+                subscription.dispose()
+            }
+        )
 
     }
-
 }

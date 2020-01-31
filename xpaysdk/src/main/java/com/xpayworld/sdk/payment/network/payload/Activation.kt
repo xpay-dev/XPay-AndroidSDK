@@ -1,8 +1,8 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.Constant
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.Constant
 import io.reactivex.Observable
 
 import retrofit2.Response

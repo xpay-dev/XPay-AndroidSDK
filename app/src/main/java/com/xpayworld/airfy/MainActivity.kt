@@ -3,7 +3,7 @@ package com.xpayworld.airfy
 import android.bluetooth.BluetoothDevice
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.*
 import com.xpayworld.sdk.payment.network.RetrofitClient
 import com.xpayworld.sdk.payment.network.payload.Activation
@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         saleData.currency = "PHP"
         saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
         saleData.orderId = "0123456789ABCDEF0123456789ABCD"
-        saleData.isOffile = true
+        saleData.isOffline = true
 //        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
 
@@ -63,10 +63,20 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 //            }
 
 
+
+
         btn_connect.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+           // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+
+
+
 
 //          XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+        }
+
+        btn_retrieve.setOnClickListener {
+
+
         }
     }
 

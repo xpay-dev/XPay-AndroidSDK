@@ -1,4 +1,4 @@
-package com.xpayworld.payment.network
+package com.xpayworld.sdk.payment.network
 
 import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.util.SharedPref
