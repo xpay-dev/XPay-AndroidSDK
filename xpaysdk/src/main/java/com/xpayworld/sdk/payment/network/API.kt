@@ -1,5 +1,6 @@
 package com.xpayworld.sdk.payment.network
 
+import android.util.Log
 import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.ActionType
 import com.xpayworld.sdk.payment.PaymentServiceListener
@@ -8,6 +9,7 @@ import com.xpayworld.sdk.payment.data.Transaction
 import com.xpayworld.sdk.payment.network.payload.Activation
 import com.xpayworld.sdk.payment.network.payload.Login
 import com.xpayworld.sdk.payment.network.payload.PurchaseTransaction
+import com.xpayworld.sdk.payment.network.payload.TransactionResponse
 import com.xpayworld.sdk.payment.utils.ProgressDialog
 import com.xpayworld.sdk.payment.utils.XPayResponse
 
@@ -40,7 +42,7 @@ class API {
         mListener = listener
     }
 
-    fun callActivation(activationPhrase: String, callback: (() -> Unit)) {
+    fun callActivation(activationPhrase: String, callback: (() -> Unit)? = null) {
         var pos = PosWS.REQUEST()
         pos.activationKey = activationPhrase
         var data = Activation()
@@ -56,6 +58,7 @@ class API {
             .doOnDispose { ProgressDialog.INSTANCE.dismiss() }
             .subscribe(
                 { result ->
+                    subscription.dispose()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
@@ -65,21 +68,22 @@ class API {
                         return@subscribe
                     }
                     SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
-                    subscription.dispose()
-                    callback.invoke()
+
+                    callback?.invoke()
                 },
                 { error ->
                     mListener?.onError(
-                        XPayResponse.ACTIVATION_FAILED.value,
-                        XPayResponse.ACTIVATION_FAILED.name
+                        XPayResponse.NETWORK_FAILED.value,
+                        XPayResponse.NETWORK_FAILED.name
                     )
+                    Log.e("Activation", error.message)
                     println(error.message)
                     subscription.dispose()
                 }
             )
     }
 
-    fun callLogin(pinCode: String) {
+    fun callLogin(pinCode: String, callback: (() -> Unit)? = null) {
 
         var data = Login()
         data.pin = pinCode
@@ -92,7 +96,7 @@ class API {
             .doOnDispose { ProgressDialog.INSTANCE.dismiss() }
             .subscribe(
                 { result ->
-
+                    subscription.dispose()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
@@ -103,24 +107,29 @@ class API {
                     }
                     SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
                     SharedPref.INSTANCE.writeMessage(PosWS.PREF_RTOKEN, result.rToken!!)
-                    subscription.dispose()
+
+                    callback?.invoke()
                 },
                 { error ->
                     mListener?.onError(
-                        XPayResponse.ENTER_PIN_FAILED.value,
-                        XPayResponse.ENTER_PIN_FAILED.name
+                        XPayResponse.NETWORK_FAILED.value,
+                        XPayResponse.NETWORK_FAILED.name
                     )
+                    Log.e("PIN", error.message)
                     println(error.message)
                     subscription.dispose()
                 }
             )
     }
 
-    fun callTransaction(txn: Transaction, callback: ((response: Any, purchase: Transaction) -> Unit)) {
+    fun callTransaction(
+        txn: Transaction,
+        callback: ((response: Any, purchase: Transaction) -> Unit)
+    ) {
         val data = PurchaseTransaction()
         data.processOffline = txn.isOffline
         data.attach(txn)
-        var resultTxn: Observable<Response<TransactionResult>>? = null
+        var resultTxn: Observable<Response<PurchaseTransaction.RESULT>>? = null
         val api = mClient.create(PurchaseTransaction.API::class.java)
         resultTxn = if (txn.card?.serviceCode != "") {
             data.action = PurchaseTransaction.Action.SWIPE.ordinal
@@ -133,15 +142,16 @@ class API {
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
-            { result ->
-                callback.invoke(result,txn)
-            },
-            { error ->
-                callback.invoke(error,txn)
-                println(error.message)
-                subscription.dispose()
-            }
-        )
+                { result ->
+                    val response = result.body()!!.data!!
+                    callback.invoke(response, txn)
+                },
+                { error ->
+
+                    callback.invoke(error, txn)
+                    Log.e("Trans error", error.localizedMessage)
+                }
+            )
 
     }
 }

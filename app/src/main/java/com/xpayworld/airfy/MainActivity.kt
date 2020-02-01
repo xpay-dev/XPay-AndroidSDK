@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         saleData.currencyCode = 608
         saleData.currency = "PHP"
         saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-        saleData.orderId = randomAlphaNumericString(8)
+        saleData.orderId = randomAlphaNumericString(30)
         saleData.isOffline = true
 //        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
@@ -89,6 +89,10 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
     override fun onTransactionResult(result: Int?, message: String?) {
         println("Transaction RESULT  ${result}  : ${message} ")
+    }
+
+    override fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?) {
+        println("ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}")
     }
 
     override fun onError(error: Int?, message: String?) {

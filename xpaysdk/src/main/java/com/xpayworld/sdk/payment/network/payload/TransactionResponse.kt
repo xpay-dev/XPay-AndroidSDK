@@ -1,14 +1,15 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
+import com.xpayworld.sdk.payment.network.PosWS
 
 class TransactionResponse {
 
         @SerializedName("AcquirerName ")
         var acquirerName: String? = null
 
-        @SerializedName("ApprovarCode")
-        var approvarCode: String? = null
+        @SerializedName("ApprovalCode")
+        var approvalCode: String? = null
 
         @SerializedName("AuthNumber")
         var authNumber: String? = null
@@ -29,7 +30,7 @@ class TransactionResponse {
         var cardType: String? = null
 
         @SerializedName("Currency")
-        var currency: String? = null
+        var currency: String? = "PHP"
 
         @SerializedName("MerchantId")
         var merchantId: String? = null
@@ -79,23 +80,26 @@ class TransactionResponse {
         @SerializedName("Tax2Rate")
         var tax2Rate: String? = null
 
+        @SerializedName("POSWSResponse")
+        var result : PosWS.RESPONSE? = null
+
         @SerializedName("TerminalId")
         var terminalId: String? = null
 
         @SerializedName("Timestamp")
-        var timestamp: String? = null
+        var timestamp: String? = "11/4/2019 10:58:03 PM"
 
         @SerializedName("Tips")
         var tips: String? = null
 
         @SerializedName("Total")
-        var total: String? = null
+        var total: String? = ""
 
         @SerializedName("TransactionEntryType")
         var transactionEntryType: String? = null
 
         @SerializedName("TransactionNumber")
-        var transNumber: String? = null
+        var transNumber: String? = ""
 
         @SerializedName("TransactionReqToken ")
         var transactionReqToken: String? = null
@@ -104,6 +108,6 @@ class TransactionResponse {
         var transactionSignature: String? = null
 
         @SerializedName("TransactionType")
-        var transType: String? = null
+        var transType: String? = "Sale"
 
 }

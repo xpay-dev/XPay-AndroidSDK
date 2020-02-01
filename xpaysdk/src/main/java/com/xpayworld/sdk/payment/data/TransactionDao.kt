@@ -15,8 +15,11 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertTransaction(vararg transaction: Transaction)
 
-    @Query("DELETE FROM `Transaction` WHERE orderId =:orderId")
+    @Query("DELETE FROM `transaction` WHERE orderId =:orderId")
     fun deleteTransaction(orderId: String)
+
+    @Query("DELETE FROM `transaction` WHERE isSync = 'true'")
+    fun deleteSyncTransaction()
 
     @Query("UPDATE `transaction` SET errorMessage =  :errorMessage, isSync = :isSync  WHERE orderId = :orderId")
     fun updateSync(errorMessage: String, isSync: Boolean, orderId: String)

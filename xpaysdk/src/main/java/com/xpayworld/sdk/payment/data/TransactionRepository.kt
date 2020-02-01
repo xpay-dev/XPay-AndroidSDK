@@ -1,40 +1,45 @@
 package com.xpayworld.sdk.payment.data
 
- class TransactionRepository private constructor(
-    private val transDao : TransactionDao
-){
+class TransactionRepository private constructor(
+    private val transDao: TransactionDao
+) {
 
     fun getTransaction() = transDao.getTransaction()
 
-    fun createTransaction(trans : Transaction){
+    fun createTransaction(trans: Transaction) {
         transDao.insertTransaction(trans)
     }
 
-    fun deleteAllTransaction(){
+    fun deleteAllTransaction() {
         transDao.deleteAllTransaction()
     }
 
-    fun updateTransaction(errorMessage :String, isSync : Boolean , orderId : String){
-        transDao.updateSync(errorMessage = errorMessage ,isSync = isSync, orderId =  orderId)
+    fun deleteSyncTransaction() {
+        transDao.deleteSyncTransaction()
     }
 
-    fun updateSignatureTransaction(sign : String , orderId: String){
-        transDao.updateSignature(sign,orderId)
+    fun updateTransaction(errorMessage: String, isSync: Boolean, orderId: String) {
+        transDao.updateSync(errorMessage = errorMessage, isSync = isSync, orderId = orderId)
     }
 
-    fun  deleteTranscation(orderId: String){
-        transDao.deleteTransaction(orderId= orderId)
+    fun updateSignatureTransaction(sign: String, orderId: String) {
+        transDao.updateSignature(sign, orderId)
     }
 
-    fun searchTransaction(orderId: String): List<Transaction>{
+    fun deleteTransaction(orderId: String) {
+        transDao.deleteTransaction(orderId = orderId)
+    }
+
+    fun searchTransaction(orderId: String): List<Transaction> {
         return transDao.searchTransaction(orderId)
     }
 
-    companion object{
+    companion object {
 
-        @Volatile private  var instance: TransactionRepository? = null
+        @Volatile
+        private var instance: TransactionRepository? = null
 
-        fun getInstance(transDao: TransactionDao) = instance ?: synchronized(this){
+        fun getInstance(transDao: TransactionDao) = instance ?: synchronized(this) {
             instance ?: TransactionRepository(transDao).also { instance = it }
         }
     }

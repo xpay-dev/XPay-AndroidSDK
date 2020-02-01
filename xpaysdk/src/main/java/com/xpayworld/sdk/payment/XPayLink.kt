@@ -4,17 +4,17 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.net.ConnectivityManager
+import android.util.Log
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
 import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
-import com.xpayworld.sdk.payment.data.Card
-import com.xpayworld.sdk.payment.data.XPayDatabase
-import com.xpayworld.sdk.payment.data.Transaction
-import com.xpayworld.sdk.payment.data.TransactionRepository
+import com.xpayworld.sdk.payment.data.*
 import com.xpayworld.sdk.payment.network.API
 import com.xpayworld.sdk.payment.network.TransactionResult
+import com.xpayworld.sdk.payment.network.payload.PurchaseTransaction
+import com.xpayworld.sdk.payment.network.payload.TransactionResponse
 import com.xpayworld.sdk.payment.utils.DispatchGroup
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
@@ -64,6 +64,7 @@ interface PaymentServiceListener {
 
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
     fun onTransactionResult(result: Int?, message: String?)
+    fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
     fun onError(error: Int?, message: String?)
 
 }
@@ -82,6 +83,14 @@ class XPayLink {
     private var mActionType: ActionType? = null
     private var mListener: PaymentServiceListener? = null
     private var mCard = Card()
+
+    private var mTotalTransactions: Int? = 0
+
+    private val mTransactionRepo: TransactionRepository by lazy {
+        TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()
+        )
+    }
 
     init {
         INSTANCE = this
@@ -143,7 +152,7 @@ class XPayLink {
                     }
                     Connection.BLUETOOTH -> {
                         ProgressDialog.INSTANCE.attach(CONTEXT)
-                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH){
+                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
                             startEMV()
                             return
                         }
@@ -168,7 +177,7 @@ class XPayLink {
             }
 
             is ActionType.BATCH_UPLOAD -> {
-                uploadTransaction()
+                processBatchUpload()
             }
         }
     }
@@ -182,48 +191,80 @@ class XPayLink {
         mBBDeviceController?.connectBT(device)
     }
 
-    private fun uploadTransaction() {
+
+    fun getTransactions(): List<Transaction> {
+        return TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()
+        ).getTransaction()
+    }
+
+
+    private fun processBatchUpload() {
         if (!isNetworkAvailable()) {
             mListener?.onError(
-                XPayResponse.BATCH_NETWORK_FAILED.value,
-                XPayResponse.BATCH_NETWORK_FAILED.name
+                XPayResponse.NETWORK_FAILED.value,
+                XPayResponse.NETWORK_FAILED.name
             )
-            return@uploadTransaction
+            return@processBatchUpload
         }
 
-        val txnArr = getTransactions()
-        val dispatch = DispatchGroup()
+        // Refresh Session
 
+        val pin = SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN)
+        API.INSTANCE.callLogin(pin) {
+            uploadTransaction()
+        }
+    }
+
+    private fun uploadTransaction() {
+        ProgressDialog.INSTANCE.attach(CONTEXT)
         ProgressDialog.INSTANCE.message("Transaction Uploading...")
         ProgressDialog.INSTANCE.show()
+
+        val txnArr = mTransactionRepo.getTransaction()
+        mTotalTransactions = txnArr.count()
+        val dispatch = DispatchGroup()
+
         txnArr.forEach { txn ->
             if (!txn.isSync) {
 
                 dispatch.enter()
                 // to update the sync status of transaction
-                updateTransactionStatus("",true,txn.orderId)
-                API.INSTANCE.callTransaction(txn) {response , purchase ->
-                    dispatch.leave()
-                    when (response){
-                        is TransactionResult -> {
-                            if (response.result!!.errNumber != 0.0){
-                                updateTransactionStatus(response.result!!.message!!,false,purchase.orderId)
+                mTransactionRepo.updateTransaction("", true, txn.orderId)
+                API.INSTANCE.callTransaction(txn) { response, purchase ->
+
+                    when (response) {
+                        is TransactionResponse -> {
+                            val result = response.result
+                            if (result?.errNumber != 0.0) {
+                                mTransactionRepo.updateTransaction(
+                                    result?.message!!,
+                                    false,
+                                    purchase.orderId
+                                )
                                 return@callTransaction
                             }
+                            mTransactionRepo.deleteTransaction(purchase.orderId)
                         }
                         is Throwable -> {
-                            updateTransactionStatus(response.message!!,false,purchase.orderId)
+                            mTransactionRepo.updateTransaction(
+                                response.message!!,
+                                false,
+                                purchase.orderId
+                            )
                         }
                     }
+                    dispatch.leave()
                 }
             }
         }
 
         dispatch.notify {
             ProgressDialog.INSTANCE.dismiss()
+            mListener?.onBatchUploadResult(mTotalTransactions, getTransactions().count())
         }
-
     }
+
 
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager =
@@ -269,17 +310,6 @@ class XPayLink {
         })
     }
 
-    fun getTransactions(): List<Transaction> {
-        return TransactionRepository.getInstance(
-            XPayDatabase.getDatabase()!!.transactionDao()
-        ).getTransaction()
-    }
-
-    private fun updateTransactionStatus(errorMsg: String, isSync: Boolean , orderId: String){
-        TransactionRepository.getInstance(
-            XPayDatabase.getDatabase()!!.transactionDao()).updateTransaction(errorMsg,isSync,orderId)
-    }
-
     private fun insertTransaction(): Int {
         var trans = Transaction()
         trans.amount = mSale!!.amount.div(100.0)
@@ -306,9 +336,7 @@ class XPayLink {
             return XPayResponse.CARD_EXPIRED.value
         }
 
-        TransactionRepository.getInstance(
-            XPayDatabase.getDatabase()!!.transactionDao()
-        ).createTransaction(trans)
+        mTransactionRepo.createTransaction(trans)
         return 0
     }
 
@@ -317,7 +345,9 @@ class XPayLink {
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
         data["emvOption"] = BBDeviceController.EmvOption.START
-        data["orderID"] = "${mSale?.orderId}"
+        // data["orderID"] = "${mSale?.orderId}"
+
+        data["orderID"] = "0123456789ABCDEF0123456789ABCD"
         data["randomNumber"] = "012345"
         data["checkCardMode"] = valueOf(value = mSale?.cardMode!!.ordinal)
         // Terminal Time

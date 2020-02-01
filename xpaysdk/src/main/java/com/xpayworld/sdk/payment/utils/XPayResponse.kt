@@ -7,7 +7,7 @@ enum class XPayResponse(val value: Int) {
     ACTIVATION_FAILED(-13),
     ENTER_PIN_FAILED(-14),
     CARD_EXPIRED(-15),
-    BATCH_NETWORK_FAILED(-16),
+    NETWORK_FAILED(-16),
     TXN_NETWORK_FAILED(-17),
     TXN_CANCELLED(-18);
 

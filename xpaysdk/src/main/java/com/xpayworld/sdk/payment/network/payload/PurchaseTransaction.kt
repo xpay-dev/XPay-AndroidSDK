@@ -7,7 +7,6 @@ import com.xpayworld.sdk.payment.network.TransactionResult
 import com.xpayworld.sdk.payment.data.Transaction
 import com.xpayworld.sdk.payment.network.Constant
 import io.reactivex.Observable
-import io.reactivex.Single
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Headers
@@ -138,7 +137,13 @@ class PurchaseTransaction {
 
     class REQUEST(data: PurchaseTransaction) {
         @SerializedName("request")
-        var request  = data
+        var data  = data
+    }
+
+    class RESULT{
+        @SerializedName("TransactionPurchaseCreditEMVResult")
+        var data :  TransactionResponse? = null
+
     }
 
     interface API {
@@ -146,13 +151,13 @@ class PurchaseTransaction {
             Constant.API.CHARSET,
             Constant.API.CONTENT)
         @POST(Constant.API.TRANS_CREDIT_EMV)
-        fun EMV(@Body data: REQUEST) : Observable<Response<TransactionResult>>
+        fun EMV(@Body data: REQUEST): Observable<Response<RESULT>>
 
         @Headers(
             Constant.API.CHARSET,
             Constant.API.CONTENT)
         @POST(Constant.API.TRANS_CREDIT_SWIPE)
-        fun SWIPE(@Body  data: REQUEST) : Observable<Response<TransactionResult>>
+        fun SWIPE(@Body  data: REQUEST): Observable<Response<RESULT>>
 
     }
 
