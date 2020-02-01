@@ -8,7 +8,8 @@ enum class XPayResponse(val value: Int) {
     ENTER_PIN_FAILED(-14),
     CARD_EXPIRED(-15),
     BATCH_NETWORK_FAILED(-16),
-    TXN_NETWORK_FAILED(-17);
+    TXN_NETWORK_FAILED(-17),
+    TXN_CANCELLED(-18);
 
     companion object : EnumCompanion<Int, XPayResponse>(
         XPayResponse.values().associateBy(

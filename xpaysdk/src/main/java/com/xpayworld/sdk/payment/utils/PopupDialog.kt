@@ -25,13 +25,13 @@ class PopupDialog  {
 
         builder.setPositiveButton(buttonPositive) { _: DialogInterface, _: Int ->
             text = mInput?.text.toString()
-            callback?.invoke(1)
             alertDialog?.dismiss()
+            callback?.invoke(1)
         }
 
         builder.setNegativeButton(buttonNegative){_: DialogInterface,_: Int ->
-            callback?.invoke(2)
             alertDialog?.dismiss()
+            callback?.invoke(2)
         }
 
         alertDialog = builder.create()

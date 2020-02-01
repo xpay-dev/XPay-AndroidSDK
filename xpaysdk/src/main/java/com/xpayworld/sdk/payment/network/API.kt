@@ -1,6 +1,7 @@
 package com.xpayworld.sdk.payment.network
 
 import com.xpayworld.payment.util.SharedPref
+import com.xpayworld.sdk.payment.ActionType
 import com.xpayworld.sdk.payment.PaymentServiceListener
 import com.xpayworld.sdk.payment.XPayLink
 import com.xpayworld.sdk.payment.data.Transaction
@@ -52,10 +53,9 @@ class API {
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .doOnSubscribe { ProgressDialog.INSTANCE.show() }
-            .doAfterTerminate { ProgressDialog.INSTANCE.dismiss() }
+            .doOnDispose { ProgressDialog.INSTANCE.dismiss() }
             .subscribe(
                 { result ->
-                    ProgressDialog.INSTANCE.dismiss()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
@@ -89,7 +89,7 @@ class API {
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .doOnSubscribe { ProgressDialog.INSTANCE.show() }
-            .doAfterTerminate { ProgressDialog.INSTANCE.dismiss() }
+            .doOnDispose { ProgressDialog.INSTANCE.dismiss() }
             .subscribe(
                 { result ->
 
@@ -102,6 +102,7 @@ class API {
                         return@subscribe
                     }
                     SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
+                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_RTOKEN, result.rToken!!)
                     subscription.dispose()
                 },
                 { error ->
@@ -115,18 +116,23 @@ class API {
             )
     }
 
-    fun callTransaction() {
-        val txn = Transaction()
+    fun callTransaction(txn: Transaction) {
         val data = PurchaseTransaction()
+        data.processOffline = txn.isOffline
+        data.attach(txn)
         var resultTxn: Observable<Response<TransactionResult>>? = null
         val api = mClient.create(PurchaseTransaction.API::class.java)
         resultTxn = if (txn.card?.serviceCode != "") {
+            data.action = PurchaseTransaction.Action.SWIPE.ordinal
             api.SWIPE(PurchaseTransaction.REQUEST(data))
         } else {
+            data.action = PurchaseTransaction.Action.EMV.ordinal
             api.EMV(PurchaseTransaction.REQUEST(data))
         }
-
-        subscription = resultTxn.subscribe(
+        subscription = resultTxn
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
             { result ->
 
             },

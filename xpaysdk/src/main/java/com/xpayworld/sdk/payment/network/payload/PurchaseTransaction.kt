@@ -1,6 +1,7 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
+import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.network.TransactionResult
 import com.xpayworld.sdk.payment.data.Transaction
@@ -77,6 +78,11 @@ class PurchaseTransaction {
 
     init {
         INSTANCE = this
+
+        val sharedPref = SharedPref.INSTANCE
+        val posReq = PosWS.REQUEST()
+        posReq.activationKey = sharedPref.readMessage(PosWS.PREF_ACTIVATION)
+        posWsRequest  = posReq
     }
 
     inner class CardDetails {

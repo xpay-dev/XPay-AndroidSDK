@@ -32,8 +32,8 @@ sealed class ActionType {
     object PRINTER : ActionType()
     object REFUND : ActionType()
     object ACTIVATION : ActionType()
-    object PIN: ActionType()
-    object BATCH_UPLOAD: ActionType()
+    object PIN : ActionType()
+    object BATCH_UPLOAD : ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -176,8 +176,8 @@ class XPayLink {
         mBBDeviceController?.connectBT(device)
     }
 
-    private fun uploadTransaction(){
-        if (isNetworkAvailable()){
+    private fun uploadTransaction() {
+        if (!isNetworkAvailable()) {
             mListener?.onError(
                 XPayResponse.BATCH_NETWORK_FAILED.value,
                 XPayResponse.BATCH_NETWORK_FAILED.name
@@ -185,10 +185,17 @@ class XPayLink {
             return@uploadTransaction
         }
 
+        val txnArr = fetchTransaction()
+
+        txnArr.forEach {
+            API.INSTANCE.callTransaction(it)
+        }
+
     }
 
     private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = CONTEXT.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+        val connectivityManager =
+            CONTEXT.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
         val activeNetworkInfo = connectivityManager!!.activeNetworkInfo
         return activeNetworkInfo != null
     }
@@ -210,7 +217,7 @@ class XPayLink {
         dialog.show(callback = { buttonId ->
             if (buttonId == 1) {
                 API.INSTANCE.attach(mListener!!)
-                API.INSTANCE.callActivation(dialog.text!!,callback = {
+                API.INSTANCE.callActivation(dialog.text!!, callback = {
                     showEnterPin()
                 })
             }
@@ -230,9 +237,16 @@ class XPayLink {
         })
     }
 
-    private fun insertTransaction(): Int{
-        var trans =   Transaction()
-        trans.amount =  mSale!!.amount.div(100.0)
+    fun fetchTransaction(): List<Transaction> {
+        return TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()
+        ).getTransaction()
+    }
+
+
+    private fun insertTransaction(): Int {
+        var trans = Transaction()
+        trans.amount = mSale!!.amount.div(100.0)
         trans.currency = mSale!!.currency
         trans.orderId = mSale!!.orderId
         trans.isOffline = mSale!!.isOffline
@@ -248,7 +262,7 @@ class XPayLink {
         val year: Int = calendar.get(Calendar.YEAR)
         val month: Int = calendar.get(Calendar.MONTH)
 
-        if ((cardYear <= year) && cardMonth < month){
+        if ((cardYear <= year) && cardMonth < month) {
             mListener?.onError(
                 XPayResponse.CARD_EXPIRED.value,
                 XPayResponse.CARD_EXPIRED.name
@@ -257,7 +271,8 @@ class XPayLink {
         }
 
         TransactionRepository.getInstance(
-            XPayDatabase.getDatabase()!!.transactionDao()).createTransaction(trans)
+            XPayDatabase.getDatabase()!!.transactionDao()
+        ).createTransaction(trans)
         return 0
     }
 
@@ -373,16 +388,16 @@ class XPayLink {
 
         override fun onRequestOnlineProcess(tlv: String?) {
             val decodeData = BBDeviceController.decodeTlv(tlv)
-            mCard.emvICCData =  decodeData["C2"].toString()
-            mCard.expiryDate =  decodeData["5F24"].toString()
+            mCard.emvICCData = decodeData["C2"].toString()
+            mCard.expiryDate = decodeData["5F24"].toString()
             mCard.ksn = decodeData["C0"].toString()
             mCard.cardNumber = decodeData["5A"].toString()
             mCard.cardXNumber = decodeData["C4"].toString()
 
-           if (insertTransaction() != 0 && mSale?.isOffline == true) {
-               mBBDeviceController?.sendOnlineProcessResult("8A023035")
-               return
-           }
+            if (insertTransaction() != 0 && mSale?.isOffline == true) {
+                mBBDeviceController?.sendOnlineProcessResult("8A023035")
+                return
+            }
             mBBDeviceController?.sendOnlineProcessResult("8A023030")
             //8A023030
         }
@@ -628,8 +643,14 @@ class XPayLink {
 
         }
 
-        override fun onReturnCancelCheckCardResult(p0: Boolean) {
-
+        override fun onReturnCancelCheckCardResult(isCancel: Boolean) {
+            if (isCancel) {
+                ProgressDialog.INSTANCE.dismiss()
+                mListener?.onError(
+                    XPayResponse.TXN_CANCELLED.value,
+                    XPayResponse.TXN_CANCELLED.name
+                )
+            }
         }
 
         override fun onBatteryLow(p0: BBDeviceController.BatteryStatus?) {
@@ -690,14 +711,14 @@ class XPayLink {
             decodeData: Hashtable<String, String>
         ) {
 
-            if(checkCardResult == BBDeviceController.CheckCardResult.MSR) {
+            if (checkCardResult == BBDeviceController.CheckCardResult.MSR) {
 
                 var expiryDate = decodeData["expiryDate"].toString()
 
                 mCard.ksn = decodeData["ksn"].toString()
                 mCard.cardNumber = decodeData["pan"].toString()
                 mCard.cardXNumber = decodeData["maskedPAN"].toString()
-                mCard.expiryDate =  expiryDate
+                mCard.expiryDate = expiryDate
                 mCard.expiryYear = expiryDate.substring(0..2)
                 mCard.expiryMonth = expiryDate.substring(2..4)
                 mCard.encTrack2 = decodeData["encTrack2"].toString()
@@ -707,9 +728,9 @@ class XPayLink {
 //                proceedTransaction.value = true
 
 
-            } else if(checkCardResult == BBDeviceController.CheckCardResult.INSERTED_CARD){
+            } else if (checkCardResult == BBDeviceController.CheckCardResult.INSERTED_CARD) {
 
-            } else if (checkCardResult == BBDeviceController.CheckCardResult.TAP_CARD_DETECTED){
+            } else if (checkCardResult == BBDeviceController.CheckCardResult.TAP_CARD_DETECTED) {
 
             }
 
