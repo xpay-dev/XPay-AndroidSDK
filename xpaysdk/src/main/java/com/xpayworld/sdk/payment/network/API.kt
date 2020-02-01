@@ -24,7 +24,6 @@ class API {
 
     private var mListener: PaymentServiceListener? = null
     private lateinit var subscription: Disposable
-
     private val mClient = RetrofitClient().getRetrofit()
 
     init {
@@ -37,19 +36,20 @@ class API {
         var INSTANCE = API()
     }
 
-
     fun attach(listener: PaymentServiceListener) {
         mListener = listener
     }
 
     fun callActivation(activationPhrase: String, callback: (() -> Unit)? = null) {
+
         var pos = PosWS.REQUEST()
         pos.activationKey = activationPhrase
+
         var data = Activation()
         data.imei = ""
-        data.manufacturer = ""
-        data.ip = "0.0.0"
+        data.manufacturer = "Android"
         data.posWsRequest = pos
+
         val api = mClient.create(Activation.API::class.java)
         subscription = api.activation(Activation.REQUEST(data))
             .subscribeOn(Schedulers.io())
@@ -76,7 +76,6 @@ class API {
                         XPayResponse.NETWORK_FAILED.value,
                         XPayResponse.NETWORK_FAILED.name
                     )
-                    Log.e("Activation", error.message)
                     println(error.message)
                     subscription.dispose()
                 }
@@ -115,7 +114,6 @@ class API {
                         XPayResponse.NETWORK_FAILED.value,
                         XPayResponse.NETWORK_FAILED.name
                     )
-                    Log.e("PIN", error.message)
                     println(error.message)
                     subscription.dispose()
                 }
@@ -124,13 +122,16 @@ class API {
 
     fun callTransaction(
         txn: Transaction,
-        callback: ((response: Any, purchase: Transaction) -> Unit)
+        callback: ((response: Any,
+                    purchase: Transaction) -> Unit)
     ) {
         val data = PurchaseTransaction()
         data.processOffline = txn.isOffline
         data.attach(txn)
+
         var resultTxn: Observable<Response<PurchaseTransaction.RESULT>>? = null
         val api = mClient.create(PurchaseTransaction.API::class.java)
+
         resultTxn = if (txn.card?.serviceCode != "") {
             data.action = PurchaseTransaction.Action.SWIPE.ordinal
             api.SWIPE(PurchaseTransaction.REQUEST(data))
@@ -147,9 +148,7 @@ class API {
                     callback.invoke(response, txn)
                 },
                 { error ->
-
                     callback.invoke(error, txn)
-                    Log.e("Trans error", error.localizedMessage)
                 }
             )
 

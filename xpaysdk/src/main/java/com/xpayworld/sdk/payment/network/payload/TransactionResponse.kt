@@ -87,7 +87,7 @@ class TransactionResponse {
         var terminalId: String? = null
 
         @SerializedName("Timestamp")
-        var timestamp: String? = "11/4/2019 10:58:03 PM"
+        var timestamp: String? = ""
 
         @SerializedName("Tips")
         var tips: String? = null
@@ -108,6 +108,6 @@ class TransactionResponse {
         var transactionSignature: String? = null
 
         @SerializedName("TransactionType")
-        var transType: String? = "Sale"
+        var transType: String? = ""
 
 }
