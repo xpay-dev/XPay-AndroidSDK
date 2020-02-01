@@ -5,8 +5,6 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.*
-import com.xpayworld.sdk.payment.data.TransactionRepository
-import com.xpayworld.sdk.payment.data.XPayDatabase
 import com.xpayworld.sdk.payment.network.RetrofitClient
 import com.xpayworld.sdk.payment.network.payload.Activation
 import io.reactivex.disposables.Disposable
@@ -67,7 +65,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
 
 
-        btn_fetch.setOnClickListener {
+        btn_batch.setOnClickListener {
            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
         }
 
@@ -76,7 +74,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
               XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
         }
 
-        btn_retrieve.setOnClickListener {
+        btn_start.setOnClickListener {
             XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
         }
     }

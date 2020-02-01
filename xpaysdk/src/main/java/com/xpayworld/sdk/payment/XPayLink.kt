@@ -32,7 +32,7 @@ sealed class ActionType {
     data class SALE(var sale: Sale) : ActionType()
 
     object PRINTER : ActionType()
-    object REFUND : ActionType()
+    data class REFUND(var txnNumber: String) : ActionType()
     object ACTIVATION : ActionType()
     object PIN : ActionType()
     object BATCH_UPLOAD : ActionType()
@@ -148,7 +148,7 @@ class XPayLink {
 
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
-
+                        mBBDeviceController?.startSerial()
                     }
                     Connection.BLUETOOTH -> {
                         ProgressDialog.INSTANCE.attach(CONTEXT)
@@ -165,7 +165,7 @@ class XPayLink {
             }
 
             is ActionType.REFUND -> {
-
+               mTransactionRepo.deleteTransaction(type.txnNumber)
             }
 
             is ActionType.ACTIVATION -> {
@@ -198,7 +198,6 @@ class XPayLink {
         ).getTransaction()
     }
 
-
     private fun processBatchUpload() {
         if (!isNetworkAvailable()) {
             mListener?.onError(
@@ -209,7 +208,6 @@ class XPayLink {
         }
 
         // Refresh Session
-
         val pin = SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN)
         API.INSTANCE.callLogin(pin) {
             uploadTransaction()
@@ -264,7 +262,6 @@ class XPayLink {
             mListener?.onBatchUploadResult(mTotalTransactions, getTransactions().count())
         }
     }
-
 
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager =
@@ -686,7 +683,7 @@ class XPayLink {
         }
 
         override fun onSerialConnected() {
-
+            startEMV()
         }
 
         override fun onReturnBatchData(p0: String?) {

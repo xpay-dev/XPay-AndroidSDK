@@ -26,7 +26,6 @@ class PosWS {
         @SerializedName("SystemMode")
         var systemMode: String? = "Live"
 
-
         init {
             val sharedPref = SharedPref.INSTANCE
             activationKey = sharedPref.readMessage(PREF_ACTIVATION)
