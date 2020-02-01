@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 import com.xpayworld.sdk.payment.XPayLink
 import com.xpayworld.sdk.payment.network.Constant
 
-@Database(entities = [Transaction::class ],version = 1,exportSchema = false)
+@Database(entities = [Transaction::class ],version = 2,exportSchema = false)
 abstract class XPayDatabase : RoomDatabase(){
 
     abstract fun transactionDao(): TransactionDao

@@ -21,7 +21,8 @@ data class Transaction(
     @ColumnInfo(name = "trans_date")
     var timestamp : Long = 0L,
     var cardCaptureMethod: Int = 0,
-    var device : Int = 0,
+    var device: Int = 0,
+    var errorMessage: String = "",
     @Embedded
     var card : Card? = null
 )

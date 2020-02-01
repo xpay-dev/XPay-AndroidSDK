@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         saleData.currencyCode = 608
         saleData.currency = "PHP"
         saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-        saleData.orderId = "0123456789ABCDEF0123456789ABCD"
+        saleData.orderId = randomAlphaNumericString(8)
         saleData.isOffline = true
 //        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         }
 
         btn_retrieve.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.PIN)
+            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
         }
     }
 
@@ -95,6 +95,14 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
         println("Device ERROR  ${error}  : ${message} ")
 
+    }
+
+    fun randomAlphaNumericString(desiredStrLength: Int): String {
+        val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+        return (1..desiredStrLength)
+            .map{ kotlin.random.Random.nextInt(0, charPool.size) }
+            .map(charPool::get)
+            .joinToString("")
     }
 
 

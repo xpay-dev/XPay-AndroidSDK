@@ -14,6 +14,8 @@ import com.xpayworld.sdk.payment.data.XPayDatabase
 import com.xpayworld.sdk.payment.data.Transaction
 import com.xpayworld.sdk.payment.data.TransactionRepository
 import com.xpayworld.sdk.payment.network.API
+import com.xpayworld.sdk.payment.network.TransactionResult
+import com.xpayworld.sdk.payment.utils.DispatchGroup
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
 import com.xpayworld.sdk.payment.utils.XPayResponse
@@ -141,7 +143,11 @@ class XPayLink {
                     }
                     Connection.BLUETOOTH -> {
                         ProgressDialog.INSTANCE.attach(CONTEXT)
-                        mBBDeviceController?.startBTScan(DEVICE_NAMES, 120)
+                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH){
+                            startEMV()
+                            return
+                        }
+                        mBBDeviceController?.startBTScan(DEVICE_NAMES, mSale?.timeOut!!)
                     }
                 }
             }
@@ -185,10 +191,36 @@ class XPayLink {
             return@uploadTransaction
         }
 
-        val txnArr = fetchTransaction()
+        val txnArr = getTransactions()
+        val dispatch = DispatchGroup()
 
-        txnArr.forEach {
-            API.INSTANCE.callTransaction(it)
+        ProgressDialog.INSTANCE.message("Transaction Uploading...")
+        ProgressDialog.INSTANCE.show()
+        txnArr.forEach { txn ->
+            if (!txn.isSync) {
+
+                dispatch.enter()
+                // to update the sync status of transaction
+                updateTransactionStatus("",true,txn.orderId)
+                API.INSTANCE.callTransaction(txn) {response , purchase ->
+                    dispatch.leave()
+                    when (response){
+                        is TransactionResult -> {
+                            if (response.result!!.errNumber != 0.0){
+                                updateTransactionStatus(response.result!!.message!!,false,purchase.orderId)
+                                return@callTransaction
+                            }
+                        }
+                        is Throwable -> {
+                            updateTransactionStatus(response.message!!,false,purchase.orderId)
+                        }
+                    }
+                }
+            }
+        }
+
+        dispatch.notify {
+            ProgressDialog.INSTANCE.dismiss()
         }
 
     }
@@ -201,11 +233,11 @@ class XPayLink {
     }
 
     private fun isActivated(): Boolean {
-        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
+        return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
     }
 
     private fun hasEnteredPin(): Boolean {
-        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
+        return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
 
     private fun showActivation() {
@@ -237,12 +269,16 @@ class XPayLink {
         })
     }
 
-    fun fetchTransaction(): List<Transaction> {
+    fun getTransactions(): List<Transaction> {
         return TransactionRepository.getInstance(
             XPayDatabase.getDatabase()!!.transactionDao()
         ).getTransaction()
     }
 
+    private fun updateTransactionStatus(errorMsg: String, isSync: Boolean , orderId: String){
+        TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()).updateTransaction(errorMsg,isSync,orderId)
+    }
 
     private fun insertTransaction(): Int {
         var trans = Transaction()
@@ -724,8 +760,6 @@ class XPayLink {
                 mCard.encTrack2 = decodeData["encTrack2"].toString()
                 mCard.serviceCode = decodeData["serviceCode"].toString()
                 mCard.posEntry = decodeData["posEntryMode"]!!.toInt()
-//                mCard.card = cardData
-//                proceedTransaction.value = true
 
 
             } else if (checkCardResult == BBDeviceController.CheckCardResult.INSERTED_CARD) {

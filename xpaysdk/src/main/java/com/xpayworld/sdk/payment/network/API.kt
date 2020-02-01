@@ -116,7 +116,7 @@ class API {
             )
     }
 
-    fun callTransaction(txn: Transaction) {
+    fun callTransaction(txn: Transaction, callback: ((response: Any, purchase: Transaction) -> Unit)) {
         val data = PurchaseTransaction()
         data.processOffline = txn.isOffline
         data.attach(txn)
@@ -134,13 +134,10 @@ class API {
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
             { result ->
-
+                callback.invoke(result,txn)
             },
             { error ->
-                mListener?.onError(
-                    XPayResponse.TXN_NETWORK_FAILED.value,
-                    XPayResponse.TXN_NETWORK_FAILED.name
-                )
+                callback.invoke(error,txn)
                 println(error.message)
                 subscription.dispose()
             }

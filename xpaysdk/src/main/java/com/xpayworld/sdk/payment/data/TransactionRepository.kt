@@ -14,8 +14,8 @@ package com.xpayworld.sdk.payment.data
         transDao.deleteAllTransaction()
     }
 
-    fun updateTransaction(isOffline : Boolean,isSync : Boolean , orderId : String){
-        transDao.updateSync(status= isOffline,isSync = isSync, orderId =  orderId)
+    fun updateTransaction(errorMessage :String, isSync : Boolean , orderId : String){
+        transDao.updateSync(errorMessage = errorMessage ,isSync = isSync, orderId =  orderId)
     }
 
     fun updateSignatureTransaction(sign : String , orderId: String){
