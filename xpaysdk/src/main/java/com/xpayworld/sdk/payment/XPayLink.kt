@@ -63,7 +63,7 @@ class Sale {
 interface PaymentServiceListener {
 
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
-    fun onTransactionResult(result: Int?, message: String?)
+    fun TransactionComplete()
     fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
     fun onError(error: Int?, message: String?)
 
@@ -526,8 +526,13 @@ class XPayLink {
         }
 
         override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
-            mListener?.onTransactionResult(result?.ordinal, result?.name)
             ProgressDialog.INSTANCE.dismiss()
+            if (result == BBDeviceController.TransactionResult.APPROVED){
+                mListener?.TransactionComplete()
+                return
+            }
+            mListener?.onError(result?.ordinal, result?.name)
+
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {

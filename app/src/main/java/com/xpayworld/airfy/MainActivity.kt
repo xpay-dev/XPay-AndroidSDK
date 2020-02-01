@@ -83,10 +83,8 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         devices1 = devices
     }
 
-
-
-    override fun onTransactionResult(result: Int?, message: String?) {
-        println("Transaction RESULT  ${result}  : ${message} ")
+    override fun TransactionComplete() {
+        println("Transaction SUCCESS")
     }
 
     override fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?) {
@@ -94,9 +92,7 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
     }
 
     override fun onError(error: Int?, message: String?) {
-
         println("Device ERROR  ${error}  : ${message} ")
-
     }
 
     fun randomAlphaNumericString(desiredStrLength: Int): String {
@@ -106,6 +102,4 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
             .map(charPool::get)
             .joinToString("")
     }
-
-
 }
