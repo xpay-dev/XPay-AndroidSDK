@@ -11,7 +11,7 @@ import io.reactivex.disposables.Disposable
 
 import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity() ,PaymentServiceListener {
+class MainActivity : AppCompatActivity(), PaymentServiceListener {
     private lateinit var subscription: Disposable
     var devices1: MutableList<BluetoothDevice>? = null
 
@@ -32,46 +32,15 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
         saleData.isOffline = true
 //        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
-
-//      service?.startDevice(ActionType.SALE(saleData))
-        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
-
-        var pos = PosWS.REQUEST()
-        pos.activationKey = "1VEFF5YUBV39ARIZ"
-
-
-        var data = Activation()
-        data.imei=  ""
-        data.manufacturer = ""
-        data.ip = "0.0.0"
-        data.posWsRequest = pos
-
-//        subscription = api.activation(Activation.REQUEST(data))
-//            .subscribe {
-////
-////                val sharedPref = applicationContext.let { SharedPrefStorage(it) }
-////                sharedPref.writeMessage(PosWS.PREF_ACTIVATION,pos.activationKey!!)
-//
-//            }
-
-//        var lg = Login()
-//        lg.pin = "1234"
-//
-//        subscription  = api.login(Login.REQUEST(lg))
-//            .subscribe {
-//
-//            }
-
-
-
-
         btn_batch.setOnClickListener {
-           XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
+            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
         }
 
         btn_connect.setOnClickListener {
-           // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
-              XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+            // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+            if (devices1?.count() != 0) {
+                XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+            }
         }
 
         btn_start.setOnClickListener {
@@ -81,24 +50,25 @@ class MainActivity : AppCompatActivity() ,PaymentServiceListener {
 
     override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
         devices1 = devices
+        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
     }
 
     override fun TransactionComplete() {
-        println("Transaction SUCCESS")
+        textView.text = "Transaction Completed"
     }
 
     override fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?) {
-        println("ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}")
+        textView.text = "ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}"
     }
 
     override fun onError(error: Int?, message: String?) {
-        println("Device ERROR  ${error}  : ${message} ")
+        textView.text = "Device ERROR  ${error}  : ${message} "
     }
 
     fun randomAlphaNumericString(desiredStrLength: Int): String {
         val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
         return (1..desiredStrLength)
-            .map{ kotlin.random.Random.nextInt(0, charPool.size) }
+            .map { kotlin.random.Random.nextInt(0, charPool.size) }
             .map(charPool::get)
             .joinToString("")
     }

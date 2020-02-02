@@ -68,7 +68,8 @@ class API {
                         return@subscribe
                     }
                     SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
-
+                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_MOBILE_APP_ID, result.mobileAppId!!)
+                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACCOUNT_ID,result.accountId!!)
                     callback?.invoke()
                 },
                 { error ->
