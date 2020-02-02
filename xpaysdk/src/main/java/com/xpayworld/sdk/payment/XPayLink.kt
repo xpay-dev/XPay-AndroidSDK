@@ -127,7 +127,6 @@ class XPayLink {
         mActionType = type
         when (type) {
             is ActionType.SALE -> {
-
                 mSale = type.sale
 
                 if (!isActivated()) {
@@ -177,7 +176,7 @@ class XPayLink {
             }
 
             is ActionType.BATCH_UPLOAD -> {
-                processBatchUpload()
+                    processBatchUpload()
             }
         }
     }
@@ -307,15 +306,7 @@ class XPayLink {
         })
     }
 
-    private fun insertTransaction(): Int {
-        var trans = Transaction()
-        trans.amount = mSale!!.amount.div(100.0)
-        trans.currency = mSale!!.currency
-        trans.orderId = mSale!!.orderId
-        trans.isOffline = mSale!!.isOffline
-        trans.card = mCard
-        trans.timestamp = System.currentTimeMillis()
-
+    private fun shouldCheckCardExpiry() : Int{
         // Check if the card is already expired
         val cardExpiry = mCard.expiryDate
         val cardYear = "20${cardExpiry.substring(0..2)}".toInt()
@@ -332,9 +323,18 @@ class XPayLink {
             )
             return XPayResponse.CARD_EXPIRED.value
         }
-
-        mTransactionRepo.createTransaction(trans)
         return 0
+    }
+
+    private fun insertTransaction() {
+        var trans = Transaction()
+        trans.amount = mSale!!.amount.div(100.0)
+        trans.currency = mSale!!.currency
+        trans.orderId = mSale!!.orderId
+        trans.isOffline = mSale!!.isOffline
+        trans.card = mCard
+        trans.timestamp = System.currentTimeMillis()
+
     }
 
     @SuppressLint("SimpleDateFormat")
@@ -457,10 +457,31 @@ class XPayLink {
             mCard.cardNumber = decodeData["5A"].toString()
             mCard.cardXNumber = decodeData["C4"].toString()
 
-            if (insertTransaction() != 0 && mSale?.isOffline == true) {
+            var trans = Transaction()
+            trans.amount = mSale!!.amount.div(100.0)
+            trans.currency = mSale!!.currency
+            trans.orderId = mSale!!.orderId
+            trans.isOffline = mSale!!.isOffline
+            trans.card = mCard
+            trans.timestamp = System.currentTimeMillis()
+
+            if (shouldCheckCardExpiry() != 0) {
                 mBBDeviceController?.sendOnlineProcessResult("8A023035")
                 return
             }
+
+            if (mSale!!.isOffline) {
+                // if transaction is offline
+                mTransactionRepo.createTransaction(trans)
+            } else {
+                // otherwise online
+                ProgressDialog.INSTANCE.attach(CONTEXT)
+                ProgressDialog.INSTANCE.message("Loading")
+                API.INSTANCE.callTransaction(trans) { _, _ ->
+                    ProgressDialog.INSTANCE.dismiss()
+                }
+            }
+
             mBBDeviceController?.sendOnlineProcessResult("8A023030")
             //8A023030
         }
@@ -721,8 +742,8 @@ class XPayLink {
             }
         }
 
-        override fun onBatteryLow(p0: BBDeviceController.BatteryStatus?) {
-
+        override fun onBatteryLow(status: BBDeviceController.BatteryStatus?) {
+            mListener?.onError(status?.ordinal, status?.name)
         }
 
         override fun onBTScanTimeout() {

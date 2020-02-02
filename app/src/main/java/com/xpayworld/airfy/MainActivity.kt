@@ -44,7 +44,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         }
 
         btn_start.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
+//            XPayLink.INSTANCE.startAction(ActionType.PIN)
+           XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
         }
     }
 
