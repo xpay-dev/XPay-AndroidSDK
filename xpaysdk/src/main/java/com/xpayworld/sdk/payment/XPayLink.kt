@@ -4,16 +4,16 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.net.ConnectivityManager
-import android.util.Log
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
-import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
-import com.xpayworld.sdk.payment.data.*
+import com.xpayworld.sdk.payment.data.Card
+import com.xpayworld.sdk.payment.data.Transaction
+import com.xpayworld.sdk.payment.data.TransactionRepository
+import com.xpayworld.sdk.payment.data.XPayDatabase
 import com.xpayworld.sdk.payment.network.API
-import com.xpayworld.sdk.payment.network.TransactionResult
-import com.xpayworld.sdk.payment.network.payload.PurchaseTransaction
+import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.network.payload.TransactionResponse
 import com.xpayworld.sdk.payment.utils.DispatchGroup
 import com.xpayworld.sdk.payment.utils.PopupDialog
@@ -63,7 +63,7 @@ class Sale {
 interface PaymentServiceListener {
 
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
-    fun TransactionComplete()
+    fun onTransactionComplete()
     fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
     fun onError(error: Int?, message: String?)
 
@@ -549,7 +549,7 @@ class XPayLink {
         override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
             ProgressDialog.INSTANCE.dismiss()
             if (result == BBDeviceController.TransactionResult.APPROVED){
-                mListener?.TransactionComplete()
+                mListener?.onTransactionComplete()
                 return
             }
             mListener?.onError(result?.ordinal, result?.name)
@@ -728,8 +728,19 @@ class XPayLink {
 
         }
 
-        override fun onReturnDeviceInfo(p0: Hashtable<String, String>?) {
+        override fun onReturnDeviceInfo(deviceInfoData: Hashtable<String, String>?) {
 
+            val firmwareVersion: String = deviceInfoData?.get("firmwareVersion").toString()
+            val batteryLevel: String = deviceInfoData?.get("batteryLevel").toString()
+            val batteryPercentage: String = deviceInfoData?.get("batteryPercentage").toString()
+            val hardwareVersion: String = deviceInfoData?.get("hardwareVersion").toString()
+
+            val serialNumber: String = deviceInfoData?.get("serialNumber").toString()
+            val modelName: String = deviceInfoData?.get("modelName").toString()
+
+
+
+            mBBDeviceController?.getDeviceInfo()
         }
 
         override fun onReturnCancelCheckCardResult(isCancel: Boolean) {

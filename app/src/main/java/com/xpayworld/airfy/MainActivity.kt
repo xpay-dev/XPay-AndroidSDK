@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         textView.text = "${devices1!![0].name} ${devices1!![0].address}"
     }
 
-    override fun TransactionComplete() {
+    override fun onTransactionComplete() {
         textView.text = "Transaction Completed"
     }
 
