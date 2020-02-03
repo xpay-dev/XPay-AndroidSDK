@@ -1,24 +1,20 @@
 package com.xpayworld.sdk.payment.network
 
-import android.util.Log
 import com.xpayworld.payment.util.SharedPref
-import com.xpayworld.sdk.payment.ActionType
 import com.xpayworld.sdk.payment.PaymentServiceListener
 import com.xpayworld.sdk.payment.XPayLink
 import com.xpayworld.sdk.payment.data.Transaction
 import com.xpayworld.sdk.payment.network.payload.Activation
 import com.xpayworld.sdk.payment.network.payload.Login
 import com.xpayworld.sdk.payment.network.payload.PurchaseTransaction
-import com.xpayworld.sdk.payment.network.payload.TransactionResponse
 import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.XPayResponse
+import com.xpayworld.sdk.payment.utils.XPayError
 
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.Observable
 import retrofit2.Response
-import java.util.*
 
 class API {
 
@@ -62,8 +58,8 @@ class API {
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
-                            XPayResponse.ACTIVATION_FAILED.value,
-                            XPayResponse.ACTIVATION_FAILED.name
+                            XPayError.ACTIVATION_FAILED.value,
+                            XPayError.ACTIVATION_FAILED.name
                         )
                         return@subscribe
                     }
@@ -74,8 +70,8 @@ class API {
                 },
                 { error ->
                     mListener?.onError(
-                        XPayResponse.NETWORK_FAILED.value,
-                        XPayResponse.NETWORK_FAILED.name
+                        XPayError.NETWORK_FAILED.value,
+                        XPayError.NETWORK_FAILED.name
                     )
                     println(error.message)
                     subscription.dispose()
@@ -100,8 +96,8 @@ class API {
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
                         mListener?.onError(
-                            XPayResponse.ENTER_PIN_FAILED.value,
-                            XPayResponse.ENTER_PIN_FAILED.name
+                            XPayError.ENTER_PIN_FAILED.value,
+                            XPayError.ENTER_PIN_FAILED.name
                         )
                         return@subscribe
                     }
@@ -112,8 +108,8 @@ class API {
                 },
                 { error ->
                     mListener?.onError(
-                        XPayResponse.NETWORK_FAILED.value,
-                        XPayResponse.NETWORK_FAILED.name
+                        XPayError.NETWORK_FAILED.value,
+                        XPayError.NETWORK_FAILED.name
                     )
                     println(error.message)
                     subscription.dispose()

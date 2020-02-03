@@ -18,7 +18,7 @@ import com.xpayworld.sdk.payment.network.payload.TransactionResponse
 import com.xpayworld.sdk.payment.utils.DispatchGroup
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.XPayResponse
+import com.xpayworld.sdk.payment.utils.XPayError
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,8 +30,7 @@ enum class Connection {
 sealed class ActionType {
     // for transaction
     data class SALE(var sale: Sale) : ActionType()
-
-    object PRINTER : ActionType()
+    data class PRINT(var print: PrintDetails) : ActionType()
     data class REFUND(var txnNumber: String) : ActionType()
     object ACTIVATION : ActionType()
     object PIN : ActionType()
@@ -59,15 +58,24 @@ class Sale {
     var timeOut: Int? = 60
 }
 
+class PrintDetails{
+    var numOfReceipt: Int = 1
+    var timeOut: Int = 60
+    var connection: Connection? = null
+    var data: ByteArray? = null
+}
+
 
 interface PaymentServiceListener {
 
     fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
     fun onTransactionComplete()
     fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
+    fun onPrintComplete()
     fun onError(error: Int?, message: String?)
-
 }
+
+
 
 @Suppress("INCOMPATIBLE_ENUM_COMPARISON")
 class XPayLink {
@@ -80,6 +88,7 @@ class XPayLink {
     private var mSelectedDevice: BluetoothDevice? = null
 
     private var mSale: Sale? = null
+    private var mPrintDetails: PrintDetails? = null
     private var mActionType: ActionType? = null
     private var mListener: PaymentServiceListener? = null
     private var mCard = Card()
@@ -131,16 +140,16 @@ class XPayLink {
 
                 if (!isActivated()) {
                     mListener?.onError(
-                        XPayResponse.ACTIVATION_FAILED.value,
-                        XPayResponse.ACTIVATION_FAILED.name
+                        XPayError.ACTIVATION_FAILED.value,
+                        XPayError.ACTIVATION_FAILED.name
                     )
                     return@startAction
                 }
 
                 if (!hasEnteredPin()) {
                     mListener?.onError(
-                        XPayResponse.ENTER_PIN_FAILED.value,
-                        XPayResponse.ENTER_PIN_FAILED.name
+                        XPayError.ENTER_PIN_FAILED.value,
+                        XPayError.ENTER_PIN_FAILED.name
                     )
                     return@startAction
                 }
@@ -159,8 +168,21 @@ class XPayLink {
                     }
                 }
             }
-            is ActionType.PRINTER -> {
+            is ActionType.PRINT -> {
+                mPrintDetails = type.print
 
+                when (mPrintDetails?.connection) {
+                    Connection.SERIAL -> {
+                       // mBBDeviceController?.startSerial()
+                    }
+                    Connection.BLUETOOTH -> {
+                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
+                            startPrinter()
+                            return
+                        }
+                        mBBDeviceController?.startBTScan(DEVICE_NAMES, mPrintDetails?.timeOut!!)
+                    }
+                }
             }
 
             is ActionType.REFUND -> {
@@ -176,14 +198,11 @@ class XPayLink {
             }
 
             is ActionType.BATCH_UPLOAD -> {
-                    processBatchUpload()
+                processBatchUpload()
             }
         }
     }
 
-    fun startPrinter(connection: Connection) {
-
-    }
 
     fun setBTConnection(device: BluetoothDevice) {
         mSelectedDevice = device
@@ -200,8 +219,8 @@ class XPayLink {
     private fun processBatchUpload() {
         if (!isNetworkAvailable()) {
             mListener?.onError(
-                XPayResponse.NETWORK_FAILED.value,
-                XPayResponse.NETWORK_FAILED.name
+                XPayError.NETWORK_FAILED.value,
+                XPayError.NETWORK_FAILED.name
             )
             return@processBatchUpload
         }
@@ -211,6 +230,10 @@ class XPayLink {
         API.INSTANCE.callLogin(pin) {
             uploadTransaction()
         }
+    }
+
+    private fun startPrinter() {
+        mBBDeviceController?.sendPrintData(mPrintDetails?.data)
     }
 
     private fun uploadTransaction() {
@@ -318,10 +341,10 @@ class XPayLink {
 
         if ((cardYear <= year) && cardMonth < month) {
             mListener?.onError(
-                XPayResponse.CARD_EXPIRED.value,
-                XPayResponse.CARD_EXPIRED.name
+                XPayError.CARD_EXPIRED.value,
+                XPayError.CARD_EXPIRED.name
             )
-            return XPayResponse.CARD_EXPIRED.value
+            return XPayError.CARD_EXPIRED.value
         }
         return 0
     }
@@ -339,6 +362,7 @@ class XPayLink {
 
     @SuppressLint("SimpleDateFormat")
     private fun startEMV() {
+        mBBDeviceController?.getDeviceInfo()
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
         data["emvOption"] = BBDeviceController.EmvOption.START
@@ -427,8 +451,8 @@ class XPayLink {
                 is ActionType.SALE -> {
                     startEMV()
                 }
-                is ActionType.PRINTER -> {
-
+                is ActionType.PRINT -> {
+                    startPrinter()
                 }
             }
         }
@@ -591,7 +615,7 @@ class XPayLink {
         }
 
         override fun onPrintDataEnd() {
-
+            mListener?.onPrintComplete()
         }
 
         override fun onReturnDisableInputAmountResult(p0: Boolean) {
@@ -631,6 +655,8 @@ class XPayLink {
         }
 
         override fun onPrintDataCancelled() {
+            mListener?.onError(XPayError.PRINT_CANCELLED.value,
+                XPayError.PRINT_CANCELLED.name)
 
         }
 
@@ -704,7 +730,7 @@ class XPayLink {
 
         }
 
-        override fun onRequestPrintData(p0: Int, p1: Boolean) {
+        override fun onRequestPrintData(index: Int, isPrint: Boolean) {
 
         }
 
@@ -738,17 +764,14 @@ class XPayLink {
             val serialNumber: String = deviceInfoData?.get("serialNumber").toString()
             val modelName: String = deviceInfoData?.get("modelName").toString()
 
-
-
-            mBBDeviceController?.getDeviceInfo()
         }
 
         override fun onReturnCancelCheckCardResult(isCancel: Boolean) {
             if (isCancel) {
                 ProgressDialog.INSTANCE.dismiss()
                 mListener?.onError(
-                    XPayResponse.TXN_CANCELLED.value,
-                    XPayResponse.TXN_CANCELLED.name
+                    XPayError.TXN_CANCELLED.value,
+                    XPayError.TXN_CANCELLED.name
                 )
             }
         }

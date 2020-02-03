@@ -62,6 +62,10 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         textView.text = "ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}"
     }
 
+    override fun onPrintComplete() {
+        textView.text = "Print Completed"
+    }
+
     override fun onError(error: Int?, message: String?) {
         textView.text = "Device ERROR  ${error}  : ${message} "
     }
