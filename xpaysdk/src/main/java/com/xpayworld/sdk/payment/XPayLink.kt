@@ -392,7 +392,7 @@ class XPayLink {
         println(currencyCharacter[0].value)
 
         // Configure Amount
-        input.put("amount", "${mSale?.amount}")
+        input.put("amount", "${ mSale!!.amount.div(100.0)}")
         input.put("transactionType", BBDeviceController.TransactionType.GOODS)
         input.put("currencyCode", "${mSale?.currencyCode}")
 
