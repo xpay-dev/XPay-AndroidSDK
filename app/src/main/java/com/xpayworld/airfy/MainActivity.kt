@@ -3,6 +3,7 @@ package com.xpayworld.airfy
 import android.bluetooth.BluetoothDevice
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.*
 import com.xpayworld.sdk.payment.network.RetrofitClient
@@ -68,6 +69,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 
     override fun onError(error: Int?, message: String?) {
         textView.text = "Device ERROR  ${error}  : ${message} "
+
+        Log.e("ERROR","${error} : ${message}")
     }
 
     fun randomAlphaNumericString(desiredStrLength: Int): String {

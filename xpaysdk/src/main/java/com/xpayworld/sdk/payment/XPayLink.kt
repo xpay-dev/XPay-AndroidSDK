@@ -252,11 +252,11 @@ class XPayLink {
                 // to update the sync status of transaction
                 mTransactionRepo.updateTransaction("", true, txn.orderId)
                 API.INSTANCE.callTransaction(txn) { response, purchase ->
-                    dispatch.leave()
                     when (response) {
                         is TransactionResponse -> {
                             val result = response.result
                             if (result?.errNumber != 0.0) {
+                                dispatch.leave()
                                 mTransactionRepo.updateTransaction(
                                     result?.message!!,
                                     false,
@@ -274,7 +274,7 @@ class XPayLink {
                             )
                         }
                     }
-
+                    dispatch.leave()
                 }
             }
         }
@@ -890,7 +890,7 @@ class XPayLink {
 
         override fun onError(error: BBDeviceController.Error?, p1: String?) {
             ProgressDialog.INSTANCE.dismiss()
-            mListener?.onError(error?.ordinal, p1)
+            mListener?.onError(error?.ordinal, error?.name)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {
