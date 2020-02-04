@@ -1,5 +1,6 @@
 package com.xpayworld.sdk.payment.network
 
+import android.util.Log
 import com.xpayworld.payment.util.SharedPref
 import com.xpayworld.sdk.payment.PaymentServiceListener
 import com.xpayworld.sdk.payment.XPayLink
@@ -141,10 +142,12 @@ class API {
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
                 { result ->
+                    Log.e("SUCCESS",result.message())
                     val response = result.body()!!.data!!
                     callback.invoke(response, txn)
                 },
                 { error ->
+                    Log.e("ERROR",error.localizedMessage)
                     callback.invoke(error, txn)
                 }
             )

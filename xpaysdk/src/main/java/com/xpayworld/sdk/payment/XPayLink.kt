@@ -252,7 +252,7 @@ class XPayLink {
                 // to update the sync status of transaction
                 mTransactionRepo.updateTransaction("", true, txn.orderId)
                 API.INSTANCE.callTransaction(txn) { response, purchase ->
-
+                    dispatch.leave()
                     when (response) {
                         is TransactionResponse -> {
                             val result = response.result
@@ -274,7 +274,7 @@ class XPayLink {
                             )
                         }
                     }
-                    dispatch.leave()
+
                 }
             }
         }
