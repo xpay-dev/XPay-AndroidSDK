@@ -1,4 +1,4 @@
-package com.xpayworld.payment.network
+package com.xpayworld.sdk.payment.network
 
 import com.google.gson.annotations.SerializedName
 import com.xpayworld.payment.util.SharedPref
@@ -8,6 +8,8 @@ class PosWS {
         const val PREF_ACTIVATION = "kActivationSecret"
         const val PREF_RTOKEN = "kRtokenSession"
         const val PREF_PIN = "kPinEnteredSecrete"
+        const val PREF_MOBILE_APP_ID = "kMobileAppId"
+        const val PREF_ACCOUNT_ID = "kAccountId"
     }
 
     class REQUEST {
@@ -25,7 +27,6 @@ class PosWS {
 
         @SerializedName("SystemMode")
         var systemMode: String? = "Live"
-
 
         init {
             val sharedPref = SharedPref.INSTANCE

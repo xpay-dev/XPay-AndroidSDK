@@ -3,20 +3,22 @@ package com.xpayworld.sdk.payment
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.net.ConnectivityManager
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
-import com.xpayworld.payment.network.PosWS
 import com.xpayworld.payment.util.SharedPref
-import com.xpayworld.sdk.payment.network.RetrofitClient
-import com.xpayworld.sdk.payment.network.payload.Activation
-import com.xpayworld.sdk.payment.network.payload.Login
+import com.xpayworld.sdk.payment.data.Card
+import com.xpayworld.sdk.payment.data.Transaction
+import com.xpayworld.sdk.payment.data.TransactionRepository
+import com.xpayworld.sdk.payment.data.XPayDatabase
+import com.xpayworld.sdk.payment.network.API
+import com.xpayworld.sdk.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.payload.TransactionResponse
+import com.xpayworld.sdk.payment.utils.DispatchGroup
 import com.xpayworld.sdk.payment.utils.PopupDialog
 import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.Response
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.Disposable
-import io.reactivex.schedulers.Schedulers
+import com.xpayworld.sdk.payment.utils.XPayError
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,11 +30,11 @@ enum class Connection {
 sealed class ActionType {
     // for transaction
     data class SALE(var sale: Sale) : ActionType()
-
-    object PRINTER : ActionType()
-    object REFUND : ActionType()
+    data class PRINT(var print: PrintDetails) : ActionType()
+    data class REFUND(var txnNumber: String) : ActionType()
     object ACTIVATION : ActionType()
-    object PIN: ActionType()
+    object PIN : ActionType()
+    object BATCH_UPLOAD : ActionType()
 }
 
 enum class CardMode(val value: Int) {
@@ -46,23 +48,34 @@ enum class CardMode(val value: Int) {
 }
 
 class Sale {
-    var amount: Int? = null
-    var currency: String? = null
-    var currencyCode: Int? = null
-    var orderId: String? = null
+    var amount: Int = 0
+    var currency: String = ""
+    var currencyCode: Int = 0
+    var orderId: String = ""
     var connection: Connection? = null
     var cardMode: CardMode? = null
-    var isOffile: Boolean? = false
+    var isOffline: Boolean = false
     var timeOut: Int? = 60
+}
+
+class PrintDetails{
+    var numOfReceipt: Int = 1
+    var timeOut: Int = 60
+    var connection: Connection? = null
+    var data: ByteArray? = null
 }
 
 
 interface PaymentServiceListener {
-    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
 
-    fun onTransactionResult(result: Int?, message: String?)
+    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
+    fun onTransactionComplete()
+    fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
+    fun onPrintComplete()
     fun onError(error: Int?, message: String?)
 }
+
+
 
 @Suppress("INCOMPATIBLE_ENUM_COMPARISON")
 class XPayLink {
@@ -75,10 +88,18 @@ class XPayLink {
     private var mSelectedDevice: BluetoothDevice? = null
 
     private var mSale: Sale? = null
+    private var mPrintDetails: PrintDetails? = null
     private var mActionType: ActionType? = null
     private var mListener: PaymentServiceListener? = null
+    private var mCard = Card()
 
-    private lateinit var subscription: Disposable
+    private var mTotalTransactions: Int? = 0
+
+    private val mTransactionRepo: TransactionRepository by lazy {
+        TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()
+        )
+    }
 
     init {
         INSTANCE = this
@@ -115,42 +136,57 @@ class XPayLink {
         mActionType = type
         when (type) {
             is ActionType.SALE -> {
-
                 mSale = type.sale
 
                 if (!isActivated()) {
                     mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
+                        XPayError.ACTIVATION_FAILED.value,
+                        XPayError.ACTIVATION_FAILED.name
                     )
                     return@startAction
                 }
 
                 if (!hasEnteredPin()) {
                     mListener?.onError(
-                        Response.ENTER_PIN_FAILED.value,
-                        Response.ENTER_PIN_FAILED.name
+                        XPayError.ENTER_PIN_FAILED.value,
+                        XPayError.ENTER_PIN_FAILED.name
                     )
                     return@startAction
                 }
 
-
                 when (mSale?.connection) {
                     Connection.SERIAL -> {
-
+                        mBBDeviceController?.startSerial()
                     }
                     Connection.BLUETOOTH -> {
                         ProgressDialog.INSTANCE.attach(CONTEXT)
-                        mBBDeviceController?.startBTScan(DEVICE_NAMES, 120)
+                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
+                            startEMV()
+                            return
+                        }
+                        mBBDeviceController?.startBTScan(DEVICE_NAMES, mSale?.timeOut!!)
                     }
                 }
             }
-            is ActionType.PRINTER -> {
+            is ActionType.PRINT -> {
+                mPrintDetails = type.print
 
+                when (mPrintDetails?.connection) {
+                    Connection.SERIAL -> {
+                       // mBBDeviceController?.startSerial()
+                    }
+                    Connection.BLUETOOTH -> {
+                        if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
+                            startPrinter()
+                            return
+                        }
+                        mBBDeviceController?.startBTScan(DEVICE_NAMES, mPrintDetails?.timeOut!!)
+                    }
+                }
             }
 
             is ActionType.REFUND -> {
-
+               mTransactionRepo.deleteTransaction(type.txnNumber)
             }
 
             is ActionType.ACTIVATION -> {
@@ -161,26 +197,108 @@ class XPayLink {
                 showEnterPin()
             }
 
+            is ActionType.BATCH_UPLOAD -> {
+                processBatchUpload()
+            }
         }
     }
 
-    fun startPrinter(connection: Connection) {
-
-    }
 
     fun setBTConnection(device: BluetoothDevice) {
         mSelectedDevice = device
         mBBDeviceController?.connectBT(device)
     }
 
+
+    fun getTransactions(): List<Transaction> {
+        return TransactionRepository.getInstance(
+            XPayDatabase.getDatabase()!!.transactionDao()
+        ).getTransaction()
+    }
+
+    private fun processBatchUpload() {
+        if (!isNetworkAvailable()) {
+            mListener?.onError(
+                XPayError.NETWORK_FAILED.value,
+                XPayError.NETWORK_FAILED.name
+            )
+            return@processBatchUpload
+        }
+
+        // Refresh Session
+        val pin = SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN)
+        API.INSTANCE.callLogin(pin) {
+            uploadTransaction()
+        }
+    }
+
+    private fun startPrinter() {
+        mBBDeviceController?.sendPrintData(mPrintDetails?.data)
+    }
+
+    private fun uploadTransaction() {
+        ProgressDialog.INSTANCE.attach(CONTEXT)
+        ProgressDialog.INSTANCE.message("Transaction Uploading...")
+        ProgressDialog.INSTANCE.show()
+
+        val txnArr = mTransactionRepo.getTransaction()
+        mTotalTransactions = txnArr.count()
+        val dispatch = DispatchGroup()
+
+        txnArr.forEach { txn ->
+            if (!txn.isSync) {
+
+                dispatch.enter()
+                // to update the sync status of transaction
+                mTransactionRepo.updateTransaction("", true, txn.orderId)
+                API.INSTANCE.callTransaction(txn) { response, purchase ->
+                    when (response) {
+                        is TransactionResponse -> {
+                            val result = response.result
+                            if (result?.errNumber != 0.0) {
+                                dispatch.leave()
+                                mTransactionRepo.updateTransaction(
+                                    result?.message!!,
+                                    false,
+                                    purchase.orderId
+                                )
+                                return@callTransaction
+                            }
+                            mTransactionRepo.deleteTransaction(purchase.orderId)
+                        }
+                        is Throwable -> {
+                            mTransactionRepo.updateTransaction(
+                                response.message!!,
+                                false,
+                                purchase.orderId
+                            )
+                        }
+                    }
+                    dispatch.leave()
+                }
+            }
+        }
+
+        dispatch.notify {
+            ProgressDialog.INSTANCE.dismiss()
+            mListener?.onBatchUploadResult(mTotalTransactions, getTransactions().count())
+        }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager =
+            CONTEXT.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+        val activeNetworkInfo = connectivityManager!!.activeNetworkInfo
+        return activeNetworkInfo != null
+    }
+
     private fun isActivated(): Boolean {
-        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
+        return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
     }
 
     private fun hasEnteredPin(): Boolean {
-        return SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
+        return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
-
 
     private fun showActivation() {
         val dialog = PopupDialog()
@@ -190,55 +308,15 @@ class XPayLink {
         dialog.hasEditText = true
         dialog.show(callback = { buttonId ->
             if (buttonId == 1) {
-                callActivationAPI(dialog.text!!)
+                API.INSTANCE.attach(mListener!!)
+                API.INSTANCE.callActivation(dialog.text!!, callback = {
+                    showEnterPin()
+                })
             }
         })
     }
 
-    private fun callActivationAPI(activationPhrase: String) {
-        var pos = PosWS.REQUEST()
-        pos.activationKey = activationPhrase
-        var data = Activation()
-        data.imei = ""
-        data.manufacturer = ""
-        data.ip = "0.0.0"
-        data.posWsRequest = pos
-        val api = RetrofitClient().getRetrofit().create(Activation.API::class.java)
-        ProgressDialog.INSTANCE.attach(CONTEXT)
-        ProgressDialog.INSTANCE.message("Loading...")
-        ProgressDialog.INSTANCE.show()
-        subscription = api.activation(Activation.REQUEST(data))
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                { result ->
-                    ProgressDialog.INSTANCE.dismiss()
-                    val result = result.body()?.data
-                    if (result?.errNumber != 0.0) {
-                        mListener?.onError(
-                            Response.ACTIVATION_FAILED.value,
-                            Response.ACTIVATION_FAILED.name
-                        )
-                        return@subscribe
-                    }
-                    SharedPref.INSTANCE.writeMessage(PosWS.PREF_ACTIVATION, pos.activationKey!!)
-                    subscription.dispose()
-                    showEnterPin()
-                },
-                { error ->
-                    ProgressDialog.INSTANCE.dismiss()
-                    mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
-                    )
-                    println(error.message)
-                    subscription.dispose()
-                }
-            )
-    }
-
     private fun showEnterPin() {
-
         val dialog = PopupDialog()
         dialog.buttonNegative = "Cancel"
         dialog.buttonPositive = "Ok"
@@ -246,53 +324,51 @@ class XPayLink {
         dialog.hasEditText = true
         dialog.show(callback = { buttonId ->
             if (buttonId == 1) {
-                callLoginAPI(dialog.text!!)
+                API.INSTANCE.callLogin(dialog.text!!)
             }
         })
     }
 
-    private fun callLoginAPI(pinCode: String){
+    private fun shouldCheckCardExpiry() : Int{
+        // Check if the card is already expired
+        val cardExpiry = mCard.expiryDate
+        val cardYear = "20${cardExpiry.substring(0..2)}".toInt()
+        val cardMonth = cardExpiry.substring(2..4).toInt()
 
-        var data = Login()
-        data.pin = pinCode
+        val calendar: Calendar = Calendar.getInstance()
+        val year: Int = calendar.get(Calendar.YEAR)
+        val month: Int = calendar.get(Calendar.MONTH)
 
-        val api = RetrofitClient().getRetrofit().create(Login.API::class.java)
-        ProgressDialog.INSTANCE.attach(CONTEXT)
-        ProgressDialog.INSTANCE.message("Loading...")
-        ProgressDialog.INSTANCE.show()
+        if ((cardYear <= year) && cardMonth < month) {
+            mListener?.onError(
+                XPayError.CARD_EXPIRED.value,
+                XPayError.CARD_EXPIRED.name
+            )
+            return XPayError.CARD_EXPIRED.value
+        }
+        return 0
+    }
 
-        subscription = api.login(Login.REQUEST(data)).subscribe(
-            { result ->
-                ProgressDialog.INSTANCE.dismiss()
-                val result = result.body()?.data
-                if (result?.errNumber != 0.0) {
-                    mListener?.onError(
-                        Response.ACTIVATION_FAILED.value,
-                        Response.ACTIVATION_FAILED.name
-                    )
-                    return@subscribe
-                }
-                SharedPref.INSTANCE.writeMessage(PosWS.PREF_PIN, data.pin)
-                subscription.dispose()
-            },
-            { error ->
-                ProgressDialog.INSTANCE.dismiss()
-                mListener?.onError(
-                    Response.ENTER_PIN_FAILED.value,
-                    Response.ENTER_PIN_FAILED.name
-                )
-                println(error.message)
-                subscription.dispose()
-            }
-        )
+    private fun insertTransaction() {
+        var trans = Transaction()
+        trans.amount = mSale!!.amount.div(100.0)
+        trans.currency = mSale!!.currency
+        trans.orderId = mSale!!.orderId
+        trans.isOffline = mSale!!.isOffline
+        trans.card = mCard
+        trans.timestamp = System.currentTimeMillis()
+
     }
 
     @SuppressLint("SimpleDateFormat")
     private fun startEMV() {
+        mBBDeviceController?.getDeviceInfo()
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
         data["emvOption"] = BBDeviceController.EmvOption.START
-        data["orderID"] = "${mSale?.orderId}"
+        // data["orderID"] = "${mSale?.orderId}"
+
+        data["orderID"] = "0123456789ABCDEF0123456789ABCD"
         data["randomNumber"] = "012345"
         data["checkCardMode"] = valueOf(value = mSale?.cardMode!!.ordinal)
         // Terminal Time
@@ -316,7 +392,7 @@ class XPayLink {
         println(currencyCharacter[0].value)
 
         // Configure Amount
-        input.put("amount", "${mSale?.amount}")
+        input.put("amount", "${ mSale!!.amount.div(100.0)}")
         input.put("transactionType", BBDeviceController.TransactionType.GOODS)
         input.put("currencyCode", "${mSale?.currencyCode}")
 
@@ -352,12 +428,10 @@ class XPayLink {
 
         override fun onRequestSelectApplication(p0: ArrayList<String>?) {
             mBBDeviceController?.selectApplication(0)
-
         }
 
         override fun onRequestDisplayText(p0: BBDeviceController.DisplayText?) {
             ProgressDialog.INSTANCE.message(p0.toString())
-
         }
 
         override fun onReturnPrintResult(p0: BBDeviceController.PrintResult?) {
@@ -377,8 +451,8 @@ class XPayLink {
                 is ActionType.SALE -> {
                     startEMV()
                 }
-                is ActionType.PRINTER -> {
-
+                is ActionType.PRINT -> {
+                    startPrinter()
                 }
             }
         }
@@ -399,7 +473,38 @@ class XPayLink {
 
         }
 
-        override fun onRequestOnlineProcess(p0: String?) {
+        override fun onRequestOnlineProcess(tlv: String?) {
+            val decodeData = BBDeviceController.decodeTlv(tlv)
+            mCard.emvICCData = decodeData["C2"].toString()
+            mCard.expiryDate = decodeData["5F24"].toString()
+            mCard.ksn = decodeData["C0"].toString()
+            mCard.cardNumber = decodeData["5A"].toString()
+            mCard.cardXNumber = decodeData["C4"].toString()
+
+            var trans = Transaction()
+            trans.amount = mSale!!.amount.div(100.0)
+            trans.currency = mSale!!.currency
+            trans.orderId = mSale!!.orderId
+            trans.isOffline = mSale!!.isOffline
+            trans.card = mCard
+            trans.timestamp = System.currentTimeMillis()
+
+            if (shouldCheckCardExpiry() != 0) {
+                mBBDeviceController?.sendOnlineProcessResult("8A023035")
+                return
+            }
+
+            if (mSale!!.isOffline) {
+                // if transaction is offline
+                mTransactionRepo.createTransaction(trans)
+            } else {
+                // otherwise online
+                ProgressDialog.INSTANCE.attach(CONTEXT)
+                ProgressDialog.INSTANCE.message("Loading")
+                API.INSTANCE.callTransaction(trans) { _, _ ->
+                    ProgressDialog.INSTANCE.dismiss()
+                }
+            }
 
             mBBDeviceController?.sendOnlineProcessResult("8A023030")
             //8A023030
@@ -466,8 +571,13 @@ class XPayLink {
         }
 
         override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
-            mListener?.onTransactionResult(result?.ordinal, result?.name)
             ProgressDialog.INSTANCE.dismiss()
+            if (result == BBDeviceController.TransactionResult.APPROVED){
+                mListener?.onTransactionComplete()
+                return
+            }
+            mListener?.onError(result?.ordinal, result?.name)
+
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {
@@ -505,7 +615,7 @@ class XPayLink {
         }
 
         override fun onPrintDataEnd() {
-
+            mListener?.onPrintComplete()
         }
 
         override fun onReturnDisableInputAmountResult(p0: Boolean) {
@@ -545,6 +655,8 @@ class XPayLink {
         }
 
         override fun onPrintDataCancelled() {
+            mListener?.onError(XPayError.PRINT_CANCELLED.value,
+                XPayError.PRINT_CANCELLED.name)
 
         }
 
@@ -618,12 +730,12 @@ class XPayLink {
 
         }
 
-        override fun onRequestPrintData(p0: Int, p1: Boolean) {
+        override fun onRequestPrintData(index: Int, isPrint: Boolean) {
 
         }
 
         override fun onSerialConnected() {
-
+            startEMV()
         }
 
         override fun onReturnBatchData(p0: String?) {
@@ -642,16 +754,30 @@ class XPayLink {
 
         }
 
-        override fun onReturnDeviceInfo(p0: Hashtable<String, String>?) {
+        override fun onReturnDeviceInfo(deviceInfoData: Hashtable<String, String>?) {
+
+            val firmwareVersion: String = deviceInfoData?.get("firmwareVersion").toString()
+            val batteryLevel: String = deviceInfoData?.get("batteryLevel").toString()
+            val batteryPercentage: String = deviceInfoData?.get("batteryPercentage").toString()
+            val hardwareVersion: String = deviceInfoData?.get("hardwareVersion").toString()
+
+            val serialNumber: String = deviceInfoData?.get("serialNumber").toString()
+            val modelName: String = deviceInfoData?.get("modelName").toString()
 
         }
 
-        override fun onReturnCancelCheckCardResult(p0: Boolean) {
-
+        override fun onReturnCancelCheckCardResult(isCancel: Boolean) {
+            if (isCancel) {
+                ProgressDialog.INSTANCE.dismiss()
+                mListener?.onError(
+                    XPayError.TXN_CANCELLED.value,
+                    XPayError.TXN_CANCELLED.name
+                )
+            }
         }
 
-        override fun onBatteryLow(p0: BBDeviceController.BatteryStatus?) {
-
+        override fun onBatteryLow(status: BBDeviceController.BatteryStatus?) {
+            mListener?.onError(status?.ordinal, status?.name)
         }
 
         override fun onBTScanTimeout() {
@@ -704,9 +830,30 @@ class XPayLink {
         }
 
         override fun onReturnCheckCardResult(
-            p0: BBDeviceController.CheckCardResult?,
-            p1: Hashtable<String, String>?
+            checkCardResult: BBDeviceController.CheckCardResult?,
+            decodeData: Hashtable<String, String>
         ) {
+
+            if (checkCardResult == BBDeviceController.CheckCardResult.MSR) {
+
+                var expiryDate = decodeData["expiryDate"].toString()
+
+                mCard.ksn = decodeData["ksn"].toString()
+                mCard.cardNumber = decodeData["pan"].toString()
+                mCard.cardXNumber = decodeData["maskedPAN"].toString()
+                mCard.expiryDate = expiryDate
+                mCard.expiryYear = expiryDate.substring(0..2)
+                mCard.expiryMonth = expiryDate.substring(2..4)
+                mCard.encTrack2 = decodeData["encTrack2"].toString()
+                mCard.serviceCode = decodeData["serviceCode"].toString()
+                mCard.posEntry = decodeData["posEntryMode"]!!.toInt()
+
+
+            } else if (checkCardResult == BBDeviceController.CheckCardResult.INSERTED_CARD) {
+
+            } else if (checkCardResult == BBDeviceController.CheckCardResult.TAP_CARD_DETECTED) {
+
+            }
 
         }
 
@@ -743,7 +890,7 @@ class XPayLink {
 
         override fun onError(error: BBDeviceController.Error?, p1: String?) {
             ProgressDialog.INSTANCE.dismiss()
-            mListener?.onError(error?.ordinal, p1)
+            mListener?.onError(error?.ordinal, error?.name)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {

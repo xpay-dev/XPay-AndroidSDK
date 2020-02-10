@@ -1,10 +1,9 @@
 package com.xpayworld.sdk.payment.network.payload
 
 import com.google.gson.annotations.SerializedName
-import com.xpayworld.payment.network.APIConstant
-import com.xpayworld.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.PosWS
+import com.xpayworld.sdk.payment.network.Constant
 import io.reactivex.Observable
-import io.reactivex.Single
 
 import retrofit2.Response
 import retrofit2.http.Body
@@ -52,9 +51,9 @@ class Activation {
 
     interface API {
         @Headers(
-            APIConstant.Charset,
-            APIConstant.Content)
-        @POST(APIConstant.ActivateApp)
+            Constant.API.CHARSET,
+            Constant.API.CONTENT)
+        @POST(Constant.API.ACTIVATE_APP)
         fun activation(@Body activate :  REQUEST): Observable<Response<RESULT>>
     }
 
