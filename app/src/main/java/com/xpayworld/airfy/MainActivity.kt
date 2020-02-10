@@ -31,13 +31,14 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
         saleData.orderId = randomAlphaNumericString(30)
         saleData.isOffline = true
-//        XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
+        //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
         btn_batch.setOnClickListener {
             XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
         }
 
         btn_connect.setOnClickListener {
+
             // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
             if (devices1?.count() != 0) {
                 XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
@@ -45,8 +46,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         }
 
         btn_start.setOnClickListener {
-           // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
-           XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
+            // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
         }
     }
 
@@ -69,8 +70,7 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 
     override fun onError(error: Int?, message: String?) {
         textView.text = "Device ERROR  ${error}  : ${message} "
-
-        Log.e("ERROR","${error} : ${message}")
+        Log.e("ERROR", "${error} : ${message}")
     }
 
     fun randomAlphaNumericString(desiredStrLength: Int): String {

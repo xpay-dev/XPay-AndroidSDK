@@ -657,7 +657,6 @@ class XPayLink {
         override fun onPrintDataCancelled() {
             mListener?.onError(XPayError.PRINT_CANCELLED.value,
                 XPayError.PRINT_CANCELLED.name)
-
         }
 
         override fun onReturnNfcDetectCardResult(
