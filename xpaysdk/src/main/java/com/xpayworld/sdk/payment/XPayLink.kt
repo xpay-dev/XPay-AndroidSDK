@@ -95,6 +95,10 @@ class XPayLink {
 
     private var mTotalTransactions: Int? = 0
 
+    private var mFirmwareVersion: String? = ""
+    private var mBatterLevel: String? = ""
+    private var mBatterPercentage: String? = ""
+
     private val mTransactionRepo: TransactionRepository by lazy {
         TransactionRepository.getInstance(
             XPayDatabase.getDatabase()!!.transactionDao()
@@ -215,6 +219,18 @@ class XPayLink {
         return TransactionRepository.getInstance(
             XPayDatabase.getDatabase()!!.transactionDao()
         ).getTransaction()
+    }
+
+    fun getFirmwareVersion(): String{
+        return mFirmwareVersion!!
+    }
+
+    fun getBatteryPercentage(): String{
+        return mBatterPercentage!!
+    }
+
+    fun getBatterLevel(): String{
+        return  mBatterLevel!!
     }
 
     private fun processBatchUpload() {
@@ -757,9 +773,9 @@ class XPayLink {
 
         override fun onReturnDeviceInfo(deviceInfoData: Hashtable<String, String>?) {
 
-            val firmwareVersion: String = deviceInfoData?.get("firmwareVersion").toString()
-            val batteryLevel: String = deviceInfoData?.get("batteryLevel").toString()
-            val batteryPercentage: String = deviceInfoData?.get("batteryPercentage").toString()
+            mFirmwareVersion = deviceInfoData?.get("firmwareVersion").toString()
+            mBatterLevel = deviceInfoData?.get("batteryLevel").toString()
+            mBatterPercentage = deviceInfoData?.get("batteryPercentage").toString()
             val hardwareVersion: String = deviceInfoData?.get("hardwareVersion").toString()
 
             val serialNumber: String = deviceInfoData?.get("serialNumber").toString()
