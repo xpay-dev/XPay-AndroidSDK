@@ -61,7 +61,7 @@ class Sale {
 class PrintDetails{
     var numOfReceipt: Int = 1
     var timeOut: Int = 60
-    var connection: Connection? = null
+    var connection: Connection? = Connection.BLUETOOTH
     var data: ByteArray? = null
 }
 
@@ -177,6 +177,7 @@ class XPayLink {
                     }
                     Connection.BLUETOOTH -> {
                         if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
+
                             startPrinter()
                             return
                         }
@@ -233,6 +234,7 @@ class XPayLink {
     }
 
     private fun startPrinter() {
+        mBBDeviceController?.startPrint(mPrintDetails!!.numOfReceipt,mPrintDetails!!.timeOut)
         mBBDeviceController?.sendPrintData(mPrintDetails?.data)
     }
 
@@ -730,7 +732,7 @@ class XPayLink {
         }
 
         override fun onRequestPrintData(index: Int, isPrint: Boolean) {
-
+           mBBDeviceController?.sendPrintData(mPrintDetails?.data)
         }
 
         override fun onSerialConnected() {
@@ -857,7 +859,6 @@ class XPayLink {
         }
 
         override fun onRequestPinEntry(p0: BBDeviceController.PinEntrySource?) {
-
         }
 
         override fun onDeviceReset() {

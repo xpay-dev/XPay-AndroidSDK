@@ -1,16 +1,16 @@
 package com.xpayworld.airfy
 
 import android.bluetooth.BluetoothDevice
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import com.xpayworld.sdk.payment.network.PosWS
+import androidx.appcompat.app.AppCompatActivity
 import com.xpayworld.sdk.payment.*
-import com.xpayworld.sdk.payment.network.RetrofitClient
-import com.xpayworld.sdk.payment.network.payload.Activation
+import com.xpayworld.sdk.payment.utils.*
 import io.reactivex.disposables.Disposable
-
 import kotlinx.android.synthetic.main.activity_main.*
+import java.io.ByteArrayOutputStream
+import java.util.*
+
 
 class MainActivity : AppCompatActivity(), PaymentServiceListener {
     private lateinit var subscription: Disposable
@@ -45,9 +45,13 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
             }
         }
 
+        val print = PrintDetails()
+        print.data = genReceipt()
+        print.numOfReceipt = 2
+
         btn_start.setOnClickListener {
-            // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
-            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
+            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
+           // XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
         }
     }
 
@@ -80,4 +84,272 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
             .map(charPool::get)
             .joinToString("")
     }
+
+
+    fun genReceipt(): ByteArray? {
+        val lineWidth = 384
+        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+        var singleLine = ""
+        for (i in 0 until size0NoEmphasizeLineWidth) {
+            singleLine += "-"
+        }
+        var doubleLine = ""
+        for (i in 0 until size0NoEmphasizeLineWidth) {
+            doubleLine += "="
+        }
+        try {
+            val baos = ByteArrayOutputStream()
+            baos.write (INIT)
+            baos.write( POWER_ON)
+
+            baos.write(NEW_LINE)
+            baos.write(CHAR_SPACING_0)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_5X12)
+            baos.write("Suite 1602, 16/F, Tower 2".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("Nina Tower, No 8 Yeung Uk Road".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("Tsuen Wan, N.T., Hong Kong".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_1)
+            baos.write(FONT_5X12)
+            baos.write("OFFICIAL RECEIPT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write("Form No. 2524".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_LEFT)
+            baos.write(FONT_10X18)
+            baos.write("ROR NO ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("ROR2014-000556-000029".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("DATE/TIME ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("08/20/2014 10:42:46 AM".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_ON)
+            baos.write("CHAN TAI MAN".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("BIR FORM NO : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("0605".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TYPE : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("AP".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("PERIOD COVERED : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("2014-8-20".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("ASSESSMENT NO : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("885".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("DUE DATE : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("2014-8-20".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            var fontSize = 0
+            var fontWidth = 10 * (fontSize + 1) + (fontSize + 1)
+            var s1 = "PARTICULARS"
+            var s2 = "AMOUNT"
+            var s = s1
+            var numOfCharacterPerLine = lineWidth / fontWidth
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            fontSize = 0
+            fontWidth = 10 * (fontSize + 1)
+            s1 = "BASIC"
+            s2 = "100.00"
+            s = s1
+            numOfCharacterPerLine = lineWidth / fontWidth
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(EMPHASIZE_OFF)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    SUBCHANGE"
+            s2 = "500.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    INTEREST"
+            s2 = "0.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    COMPROMISE"
+            s2 = "0.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL"
+            s2 = "500.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL AMOUNT DUE"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(FONT_10X18)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(doubleLine.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL AMOUNT PAID"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(FONT_10X18)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("SIX HUNDRED DOLLARS ONLY".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_10X18)
+            baos.write("MANNER OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(" ACCOUNTS RECEIVABLE".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TYPE OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(" FULL".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("MODE OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("  CASH".toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "  AMOUNT"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(EMPHASIZE_OFF)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("REMARKS".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("TEST".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_CENTER)
+            baos.write(FONT_SIZE_1)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_8X12)
+            baos.write("CARDHOLDER'S COPY".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_LEFT)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_CENTER)
+            baos.write(FONT_5X12)
+            baos.write("This is to certify that the amount indicated herein has".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("been received by the undersigned".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_10X18)
+            baos.write("CHAN SIU MING".toByteArray())
+            baos.write(NEW_LINE)
+            val barcode = "B B P O S"
+            val barcodeData =
+                Hashtable<String, String>()
+            barcodeData["barcodeDataString"] = barcode
+            barcodeData["barcodeHeight"] = "" + 50
+            barcodeData["barcodeType"] = "128"
+            val barcodeCommand: ByteArray =  getBarcodeCommand(barcodeData)
+            baos.write(barcodeCommand)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_10X18)
+            baos.write(NEW_LINE)
+            baos.write(barcode.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(POWER_OFF)
+            return baos.toByteArray()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
 }
