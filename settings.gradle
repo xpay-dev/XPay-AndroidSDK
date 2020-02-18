@@ -1,2 +1,2 @@
-include ':app', ':xpaysdk', ':xpaysdk-debug'
+include ':app', ':xpaysdk'
 rootProject.name='Airfy sdk'

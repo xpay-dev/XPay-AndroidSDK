@@ -58,11 +58,7 @@ class API {
                     subscription.dispose()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
-//                        mListener?.onError(
-//                            XPayError.ACTIVATION_FAILED.value,
-//                            XPayError.ACTIVATION_FAILED.name
-//                        )
-                        mListener?.OnError(
+                        mListener?.onError(
                             XPayError.ACTIVATION_FAILED.value,
                             XPayError.ACTIVATION_FAILED.name
                         )
@@ -74,11 +70,7 @@ class API {
                     callback?.invoke()
                 },
                 { error ->
-//                    mListener?.onError(
-//                        XPayError.NETWORK_FAILED.value,
-//                        XPayError.NETWORK_FAILED.name
-//                    )
-                    mListener?.OnError(
+                    mListener?.onError(
                         XPayError.NETWORK_FAILED.value,
                         XPayError.NETWORK_FAILED.name
                     )
@@ -104,11 +96,7 @@ class API {
                     subscription.dispose()
                     val result = result.body()?.data
                     if (result?.errNumber != 0.0) {
-//                        mListener?.onError(
-//                            XPayError.ENTER_PIN_FAILED.value,
-//                            XPayError.ENTER_PIN_FAILED.name
-//                        )
-                        mListener?.OnError(
+                        mListener?.onError(
                             XPayError.ENTER_PIN_FAILED.value,
                             XPayError.ENTER_PIN_FAILED.name
                         )
@@ -120,11 +108,7 @@ class API {
                     callback?.invoke()
                 },
                 { error ->
-//                    mListener?.onError(
-//                        XPayError.NETWORK_FAILED.value,
-//                        XPayError.NETWORK_FAILED.name
-//                    )
-                    mListener?.OnError(
+                    mListener?.onError(
                         XPayError.NETWORK_FAILED.value,
                         XPayError.NETWORK_FAILED.name
                     )
