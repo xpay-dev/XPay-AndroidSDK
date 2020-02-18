@@ -3,6 +3,7 @@ package com.xpayworld.airfy
 import android.bluetooth.BluetoothDevice
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.xpayworld.sdk.payment.*
 import com.xpayworld.sdk.payment.utils.*
@@ -16,7 +17,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
     private lateinit var subscription: Disposable
     var devices1: MutableList<BluetoothDevice>? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?)
+    {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -24,58 +26,80 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         XPayLink.INSTANCE.attach(this, this)
 
         val saleData = Sale()
-        saleData.amount = 10000
-        saleData.connection = Connection.BLUETOOTH
-        saleData.currencyCode = 608
-        saleData.currency = "PHP"
-        saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-        saleData.orderId = randomAlphaNumericString(30)
-        saleData.isOffline = true
+            saleData.amount = 10000
+            saleData.connection = Connection.BLUETOOTH
+            saleData.currencyCode = 608
+            saleData.currency = "PHP"
+            saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
+            saleData.orderId = randomAlphaNumericString(30)
+            saleData.isOffline = true
         //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
+        btn_batch.visibility = View.INVISIBLE
         btn_batch.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
+//            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
+            val print = PrintDetails()
+            print.data = genReceipt()
+            print.numOfReceipt = 2
+            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
         }
 
+        // CONNECT TO BT
+        btn_connect.visibility = View.INVISIBLE
         btn_connect.setOnClickListener {
-
             // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
             if (devices1?.count() != 0) {
                 XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
             }
         }
 
-        val print = PrintDetails()
-        print.data = genReceipt()
-        print.numOfReceipt = 2
+//        val print = PrintDetails()
+//        print.data = genReceipt()
+//        print.numOfReceipt = 2
 
+        // START TRANSACTION
+        btn_start.visibility = View.INVISIBLE
         btn_start.setOnClickListener {
-            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
-           // XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
+//            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
+//            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
+
+//            XPayLink.INSTANCE.ResetProperties()
+//                XPayLink.INSTANCE.setAmountPurchase(10000)
+//                XPayLink.INSTANCE.setCurrencyCode(840)
+//                XPayLink.INSTANCE.setCurrency("USD")
+//                XPayLink.INSTANCE.setCardCaptureMethod(CardMode.SWIPE_OR_INSERT_OR_TAP)
+//                XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
+//            XPayLink.INSTANCE.Transaction()
+
+//            btn_connect.visibility = View.VISIBLE
+
+//            btn_batch.visibility = View.VISIBLE
         }
     }
 
-    override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
-        devices1 = devices
-        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
-    }
-
-    override fun onTransactionComplete() {
-        textView.text = "Transaction Completed"
-    }
-
-    override fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?) {
-        textView.text = "ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}"
-    }
-
-    override fun onPrintComplete() {
-        textView.text = "Print Completed"
-    }
-
-    override fun onError(error: Int?, message: String?) {
-        textView.text = "Device ERROR  ${error}  : ${message} "
-        Log.e("ERROR", "${error} : ${message}")
-    }
+    //=====================================================================================
+    // XPay Callbacks
+//    override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
+////        devices1 = devices
+////        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
+//    }
+//
+//    override fun onTransactionComplete() {
+////        textView.text = "Transaction Completed"
+//    }
+//
+//    override fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?) {
+////        textView.text = "ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}"
+//    }
+//
+//    override fun onPrintComplete() {
+////        textView.text = "Print Completed"
+//    }
+//
+//    override fun onError(error: Int?, message: String?) {
+////        textView.text = "Device ERROR  ${error}  : ${message} "
+////        Log.e("ERROR", "${error} : ${message}")
+//    }
 
     fun randomAlphaNumericString(desiredStrLength: Int): String {
         val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
@@ -86,7 +110,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
     }
 
 
-    fun genReceipt(): ByteArray? {
+    fun genReceipt(): ByteArray?
+    {
         val lineWidth = 384
         val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
         var singleLine = ""
@@ -352,4 +377,40 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         return null
     }
 
+
+    //=====================================================================================
+    // AirFi Callbacks
+    override fun InitialiseComplete()
+    {
+        textView.text = "Hi AirFi"
+    }
+
+    override fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+    {
+        devices1 = devices
+        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
+        btn_start.visibility = View.VISIBLE
+    }
+
+    override fun TransactionComplete()
+    {
+        textView.text = "Transaction Completed"
+        btn_batch.visibility = View.VISIBLE
+    }
+
+    override fun OnBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
+    {
+        textView.text = "ON BATCH UPLOAD RESULT, total:  ${totalTxn} , UNSYNC: ${unsyncTxn}"
+    }
+
+    override fun OnError(error: Int?, message: String?)
+    {
+        textView.text = "Device ERROR  ${error}  : ${message} "
+        Log.e("ERROR", "${error} : ${message}")
+    }
+
+    override fun PrintComplete()
+    {
+        textView.text = "Print Completed"
+    }
 }

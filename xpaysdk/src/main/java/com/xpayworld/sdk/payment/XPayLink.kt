@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.net.ConnectivityManager
+import android.util.Log
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
 import com.bbpos.bbdevice.CAPK
@@ -15,10 +16,8 @@ import com.xpayworld.sdk.payment.data.XPayDatabase
 import com.xpayworld.sdk.payment.network.API
 import com.xpayworld.sdk.payment.network.PosWS
 import com.xpayworld.sdk.payment.network.payload.TransactionResponse
-import com.xpayworld.sdk.payment.utils.DispatchGroup
-import com.xpayworld.sdk.payment.utils.PopupDialog
-import com.xpayworld.sdk.payment.utils.ProgressDialog
-import com.xpayworld.sdk.payment.utils.XPayError
+import com.xpayworld.sdk.payment.utils.*
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -66,13 +65,26 @@ class PrintDetails{
 }
 
 
-interface PaymentServiceListener {
+interface PaymentServiceListener
+{
+    // XPay
+//    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
+//    fun onTransactionComplete()
+//    fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
+//    fun onPrintComplete()
+//    fun onError(error: Int?, message: String?)
 
-    fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?)
-    fun onTransactionComplete()
-    fun onBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
-    fun onPrintComplete()
-    fun onError(error: Int?, message: String?)
+
+    // AirFi requests
+    fun InitialiseComplete()
+    fun OnError(error: Int?, message: String?)
+    fun OnBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
+//    fun OnReadyChange()
+//    fun OnPrintReceipt()
+//    fun GetStatusComplete()
+    fun TransactionComplete()
+    fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+    fun PrintComplete()
 }
 
 
@@ -106,6 +118,7 @@ class XPayLink {
     }
 
     init {
+        Log.d("XPayLink","init")
         INSTANCE = this
     }
 
@@ -123,6 +136,10 @@ class XPayLink {
         mDeviceListener = BBPOSDeviceListener()
         mBBDeviceController = BBDeviceController.getInstance(mContext, mDeviceListener)
         BBDeviceController.setDebugLogEnabled(true)
+
+        mListener?.InitialiseComplete()
+
+        mBBDeviceController?.startBTScan(DEVICE_NAMES,60)
     }
 
     /**
@@ -138,12 +155,17 @@ class XPayLink {
      */
     fun startAction(type: ActionType) {
         mActionType = type
-        when (type) {
+        when (type)
+        {
             is ActionType.SALE -> {
                 mSale = type.sale
 
                 if (!isActivated()) {
-                    mListener?.onError(
+//                    mListener?.onError(
+//                        XPayError.ACTIVATION_FAILED.value,
+//                        XPayError.ACTIVATION_FAILED.name
+//                    )
+                    mListener?.OnError(
                         XPayError.ACTIVATION_FAILED.value,
                         XPayError.ACTIVATION_FAILED.name
                     )
@@ -151,16 +173,21 @@ class XPayLink {
                 }
 
                 if (!hasEnteredPin()) {
-                    mListener?.onError(
+//                    mListener?.onError(
+//                        XPayError.ENTER_PIN_FAILED.value,
+//                        XPayError.ENTER_PIN_FAILED.name
+//                    )
+                    mListener?.OnError(
                         XPayError.ENTER_PIN_FAILED.value,
                         XPayError.ENTER_PIN_FAILED.name
                     )
                     return@startAction
                 }
 
-                when (mSale?.connection) {
+                when (mSale?.connection)
+                {
                     Connection.SERIAL -> {
-                        mBBDeviceController?.startSerial()
+//                        mBBDeviceController?.startSerial()
                     }
                     Connection.BLUETOOTH -> {
                         ProgressDialog.INSTANCE.attach(CONTEXT)
@@ -175,9 +202,10 @@ class XPayLink {
             is ActionType.PRINT -> {
                 mPrintDetails = type.print
 
-                when (mPrintDetails?.connection) {
+                when (mPrintDetails?.connection)
+                {
                     Connection.SERIAL -> {
-                       // mBBDeviceController?.startSerial()
+                        // mBBDeviceController?.startSerial()
                     }
                     Connection.BLUETOOTH -> {
                         if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
@@ -209,7 +237,9 @@ class XPayLink {
     }
 
 
-    fun setBTConnection(device: BluetoothDevice) {
+    fun setBTConnection(device: BluetoothDevice)
+    {
+        Log.w("XPayLink","setBTConnection")
         mSelectedDevice = device
         mBBDeviceController?.connectBT(device)
     }
@@ -233,9 +263,15 @@ class XPayLink {
         return  mBatterLevel!!
     }
 
-    private fun processBatchUpload() {
+    private fun processBatchUpload()
+    {
+        Log.d("XPayLink","processBatchUpload")
         if (!isNetworkAvailable()) {
-            mListener?.onError(
+//            mListener?.onError(
+//                XPayError.NETWORK_FAILED.value,
+//                XPayError.NETWORK_FAILED.name
+//            )
+            mListener?.OnError(
                 XPayError.NETWORK_FAILED.value,
                 XPayError.NETWORK_FAILED.name
             )
@@ -254,7 +290,9 @@ class XPayLink {
         mBBDeviceController?.sendPrintData(mPrintDetails?.data)
     }
 
-    private fun uploadTransaction() {
+    private fun uploadTransaction()
+    {
+        Log.d("XPayLink","uploadTransaction")
         ProgressDialog.INSTANCE.attach(CONTEXT)
         ProgressDialog.INSTANCE.message("Transaction Uploading...")
         ProgressDialog.INSTANCE.show()
@@ -263,43 +301,54 @@ class XPayLink {
         mTotalTransactions = txnArr.count()
         val dispatch = DispatchGroup()
 
-        txnArr.forEach { txn ->
-            if (!txn.isSync) {
+        try {
+            txnArr.forEach { txn ->
+                if (!txn.isSync) {
 
-                dispatch.enter()
-                // to update the sync status of transaction
-                mTransactionRepo.updateTransaction("", true, txn.orderId)
-                API.INSTANCE.callTransaction(txn) { response, purchase ->
-                    when (response) {
-                        is TransactionResponse -> {
-                            val result = response.result
-                            if (result?.errNumber != 0.0) {
-                                dispatch.leave()
+                    dispatch.enter()
+                    // to update the sync status of transaction
+                    mTransactionRepo.updateTransaction("", true, txn.orderId)
+                    API.INSTANCE.callTransaction(txn) { response, purchase ->
+                        when (response) {
+                            is TransactionResponse -> {
+                                val result = response.result
+                                if (result?.errNumber != 0.0) {
+                                    dispatch.leave()
+                                    mTransactionRepo.updateTransaction(
+                                        result?.message!!,
+                                        false,
+                                        purchase.orderId
+                                    )
+                                    return@callTransaction
+                                }
+                                mTransactionRepo.deleteTransaction(purchase.orderId)
+                            }
+                            is Throwable -> {
                                 mTransactionRepo.updateTransaction(
-                                    result?.message!!,
+                                    response.message!!,
                                     false,
                                     purchase.orderId
                                 )
-                                return@callTransaction
                             }
-                            mTransactionRepo.deleteTransaction(purchase.orderId)
                         }
-                        is Throwable -> {
-                            mTransactionRepo.updateTransaction(
-                                response.message!!,
-                                false,
-                                purchase.orderId
-                            )
-                        }
+                        dispatch.leave()
                     }
-                    dispatch.leave()
                 }
             }
-        }
 
-        dispatch.notify {
+            dispatch.notify {
+                ProgressDialog.INSTANCE.dismiss()
+//                mListener?.onBatchUploadResult(mTotalTransactions, getTransactions().count())
+                mListener?.OnBatchUploadResult(mTotalTransactions, getTransactions().count())
+            }
+        }
+        catch (e:io.reactivex.exceptions.CompositeException)
+        {
             ProgressDialog.INSTANCE.dismiss()
-            mListener?.onBatchUploadResult(mTotalTransactions, getTransactions().count())
+            mListener?.OnError(
+                XPayError.ENTER_PIN_FAILED.value,
+                XPayError.ENTER_PIN_FAILED.name
+            )
         }
     }
 
@@ -318,7 +367,8 @@ class XPayLink {
         return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
 
-    private fun showActivation() {
+    private fun showActivation()
+    {
         val dialog = PopupDialog()
         dialog.buttonNegative = "Cancel"
         dialog.buttonPositive = "Activate"
@@ -347,7 +397,8 @@ class XPayLink {
         })
     }
 
-    private fun shouldCheckCardExpiry() : Int{
+    private fun shouldCheckCardExpiry() : Int
+    {
         // Check if the card is already expired
         val cardExpiry = mCard.expiryDate
         val cardYear = "20${cardExpiry.substring(0..2)}".toInt()
@@ -358,7 +409,11 @@ class XPayLink {
         val month: Int = calendar.get(Calendar.MONTH)
 
         if ((cardYear <= year) && cardMonth < month) {
-            mListener?.onError(
+//            mListener?.onError(
+//                XPayError.CARD_EXPIRED.value,
+//                XPayError.CARD_EXPIRED.name
+//            )
+            mListener?.OnError(
                 XPayError.CARD_EXPIRED.value,
                 XPayError.CARD_EXPIRED.name
             )
@@ -367,19 +422,22 @@ class XPayLink {
         return 0
     }
 
-    private fun insertTransaction() {
-        var trans = Transaction()
-        trans.amount = mSale!!.amount.div(100.0)
-        trans.currency = mSale!!.currency
-        trans.orderId = mSale!!.orderId
-        trans.isOffline = mSale!!.isOffline
-        trans.card = mCard
-        trans.timestamp = System.currentTimeMillis()
+    private fun insertTransaction()
+    {
+//        var trans = Transaction()
+//        trans.amount = mSale!!.amount.div(100.0)
+//        trans.currency = mSale!!.currency
+//        trans.orderId = mSale!!.orderId
+//        trans.isOffline = mSale!!.isOffline
+//        trans.card = mCard
+//        trans.timestamp = System.currentTimeMillis()
 
     }
 
     @SuppressLint("SimpleDateFormat")
-    private fun startEMV() {
+    private fun startEMV()
+    {
+        Log.w("XPayLink","private startEMV")
         mBBDeviceController?.getDeviceInfo()
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
         val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
@@ -395,7 +453,9 @@ class XPayLink {
         mBBDeviceController?.startEmv(data)
     }
 
-    private fun setAmount() {
+    private fun setAmount()
+    {
+        Log.w("XPayLink","setAmount")
         ProgressDialog.INSTANCE.show()
         ProgressDialog.INSTANCE.message("CONFIRM AMOUNT")
 
@@ -421,10 +481,403 @@ class XPayLink {
         mBBDeviceController?.setAmount(input)
     }
 
+//================================================================================================//
+//============================================ AirFi =============================================//
+//================================================================================================//
+    /**
+     * This is to ensure no residual data from a previous event
+     */
+    fun ResetProperties()
+    {
+        mSale = Sale()
+        mSale!!.connection = Connection.BLUETOOTH
+        mSale!!.isOffline = true
+    }
 
-    private inner class BBPOSDeviceListener :
-        BBDeviceController.BBDeviceControllerListener {
+    /**
+     * @param transactionType [String] "R" for Refund, "P" for Purchase
+     */
+    fun setTxnType(transactionType:String)
+    {
+        // TODO:
+    }
 
+    fun setMerchantName(merchantName:String)
+    {
+        // TODO:
+    }
+
+    /**
+     * @param orderID [String]
+     */
+    fun setOrderID(orderID:String)
+    {
+        mSale!!.orderId = orderID
+    }
+
+    /**
+     * @param timeOut [Int]
+     */
+    fun setTimeout(timeOut:Int)
+    {
+        mSale?.timeOut = timeOut
+    }
+
+    // TODO: set to decimal
+    fun setAmountPurchase(transactionAmount:Int)
+    {
+        mSale?.amount = transactionAmount
+    }
+
+    /**
+     * can be obtained from https://www.currency-iso.org/en/home/tables/table-a1.html
+     * as instructed from the bbpos API
+     * @param currencyCode [Int]
+     */
+    fun setCurrencyCode(currencyCode:Int)
+    {
+        mSale?.currencyCode = currencyCode
+    }
+
+    /**
+     * can be obtained from https://en.wikipedia.org/wiki/ISO_4217
+     * @param currencyName [String]
+     */
+    fun setCurrency(currencyName:String)
+    {
+        mSale?.currency = currencyName
+    }
+
+    /**
+     * @param cardCaptureMode [com.xpayworld.sdk.payment.CardMode]
+     */
+    fun setCardCaptureMethod(cardCaptureMode:CardMode)
+    {
+        mSale?.cardMode = cardCaptureMode
+    }
+
+    // TODO: what is this for?
+    fun setBinaryFormat()
+    {
+
+    }
+
+    // TODO:
+    fun setStaffId(flightDetails:String)
+    {
+
+    }
+
+    /**
+     * maybe to initiate the call on the device
+     */
+    fun Transaction()
+    {
+        startAction(ActionType.SALE(mSale!!))
+    }
+
+    fun InitialiseOneTimeActivationCode()
+    {
+        startAction(ActionType.ACTIVATION)
+    }
+
+    fun ShowPinEntry()
+    {
+        startAction(ActionType.PIN)
+    }
+
+// For Uploading
+    fun UploadTransaction()
+    {
+        startAction(ActionType.PIN)
+    }
+
+// For Printing
+    fun setFontSize(fontSize:Int) {}
+    fun setLineSpacing(fontSize:Int) {}
+    fun setReceipt(printData:String){}
+
+    private fun genReceipt(): ByteArray?
+    {
+        val lineWidth = 384
+        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+        var singleLine = ""
+        for (i in 0 until size0NoEmphasizeLineWidth) {
+            singleLine += "-"
+        }
+        var doubleLine = ""
+        for (i in 0 until size0NoEmphasizeLineWidth) {
+            doubleLine += "="
+        }
+        try {
+            val baos = ByteArrayOutputStream()
+            baos.write (INIT)
+            baos.write( POWER_ON)
+
+            baos.write(NEW_LINE)
+            baos.write(CHAR_SPACING_0)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_5X12)
+            baos.write("Suite 1602, 16/F, Tower 2".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("Nina Tower, No 8 Yeung Uk Road".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("Tsuen Wan, N.T., Hong Kong".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_1)
+            baos.write(FONT_5X12)
+            baos.write("OFFICIAL RECEIPT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write("Form No. 2524".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_LEFT)
+            baos.write(FONT_10X18)
+            baos.write("ROR NO ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("ROR2014-000556-000029".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("DATE/TIME ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("08/20/2014 10:42:46 AM".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_ON)
+            baos.write("CHAN TAI MAN".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("BIR FORM NO : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("0605".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TYPE : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("AP".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("PERIOD COVERED : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("2014-8-20".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("ASSESSMENT NO : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("885".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("DUE DATE : ".toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write("2014-8-20".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            var fontSize = 0
+            var fontWidth = 10 * (fontSize + 1) + (fontSize + 1)
+            var s1 = "PARTICULARS"
+            var s2 = "AMOUNT"
+            var s = s1
+            var numOfCharacterPerLine = lineWidth / fontWidth
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            fontSize = 0
+            fontWidth = 10 * (fontSize + 1)
+            s1 = "BASIC"
+            s2 = "100.00"
+            s = s1
+            numOfCharacterPerLine = lineWidth / fontWidth
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(EMPHASIZE_OFF)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    SUBCHANGE"
+            s2 = "500.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    INTEREST"
+            s2 = "0.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "    COMPROMISE"
+            s2 = "0.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL"
+            s2 = "500.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL AMOUNT DUE"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(FONT_10X18)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(doubleLine.toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "TOTAL AMOUNT PAID"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(FONT_10X18)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("SIX HUNDRED DOLLARS ONLY".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(FONT_10X18)
+            baos.write("MANNER OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(" ACCOUNTS RECEIVABLE".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TYPE OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(" FULL".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("MODE OF PAYMENT".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("  CASH".toByteArray())
+            baos.write(NEW_LINE)
+            s1 = "  AMOUNT"
+            s2 = "600.00"
+            s = s1
+            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+                s += " "
+            }
+            s += s2
+            baos.write(EMPHASIZE_OFF)
+            baos.write(s.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("REMARKS".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write("TEST".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_CENTER)
+            baos.write(FONT_SIZE_1)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_8X12)
+            baos.write("CARDHOLDER'S COPY".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_LEFT)
+            baos.write(FONT_SIZE_0)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(singleLine.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(ALIGN_CENTER)
+            baos.write(FONT_5X12)
+            baos.write("This is to certify that the amount indicated herein has".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write("been received by the undersigned".toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_10X18)
+            baos.write("CHAN SIU MING".toByteArray())
+            baos.write(NEW_LINE)
+            val barcode = "B B P O S"
+            val barcodeData =
+                Hashtable<String, String>()
+            barcodeData["barcodeDataString"] = barcode
+            barcodeData["barcodeHeight"] = "" + 50
+            barcodeData["barcodeType"] = "128"
+            val barcodeCommand: ByteArray =  getBarcodeCommand(barcodeData)
+            baos.write(barcodeCommand)
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_10X18)
+            baos.write(NEW_LINE)
+            baos.write(barcode.toByteArray())
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(POWER_OFF)
+            return baos.toByteArray()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+    fun PrintBegin()
+    {
+        val print = PrintDetails()
+        print.data = genReceipt()
+        print.numOfReceipt = 2
+        startAction(ActionType.PRINT(print))
+    }
+    fun PrintText() {} // TODO: what is this for?
+    fun PrintEnd() {}
+//================================================================================================//
+//============================================ AirFi =============================================//
+//================================================================================================//
+
+    private inner class BBPOSDeviceListener : BBDeviceController.BBDeviceControllerListener
+    {
         override fun onReturnUpdateAIDResult(p0: Hashtable<String, BBDeviceController.TerminalSettingStatus>?) {
 
         }
@@ -464,15 +917,18 @@ class XPayLink {
 
         }
 
-        override fun onBTConnected(p0: BluetoothDevice?) {
-            when (mActionType) {
-                is ActionType.SALE -> {
-                    startEMV()
-                }
-                is ActionType.PRINT -> {
-                    startPrinter()
-                }
-            }
+        override fun onBTConnected(p0: BluetoothDevice?)
+        {
+            Log.w("XPayLink","onBTConnected")
+//            when (mActionType)
+//            {
+//                is ActionType.SALE -> {
+//                    startEMV()
+//                }
+//                is ActionType.PRINT -> {
+//                    startPrinter()
+//                }
+//            }
         }
 
         override fun onReturnApduResult(p0: Boolean, p1: Hashtable<String, Any>?) {
@@ -491,21 +947,22 @@ class XPayLink {
 
         }
 
-        override fun onRequestOnlineProcess(tlv: String?) {
+        override fun onRequestOnlineProcess(tlv: String?)
+        {
             val decodeData = BBDeviceController.decodeTlv(tlv)
-            mCard.emvICCData = decodeData["C2"].toString()
-            mCard.expiryDate = decodeData["5F24"].toString()
-            mCard.ksn = decodeData["C0"].toString()
-            mCard.cardNumber = decodeData["5A"].toString()
-            mCard.cardXNumber = decodeData["C4"].toString()
+                mCard.emvICCData = decodeData["C2"].toString()
+                mCard.expiryDate = decodeData["5F24"].toString()
+                mCard.ksn = decodeData["C0"].toString()
+                mCard.cardNumber = decodeData["5A"].toString()
+                mCard.cardXNumber = decodeData["C4"].toString()
 
-            var trans = Transaction()
-            trans.amount = mSale!!.amount.div(100.0)
-            trans.currency = mSale!!.currency
-            trans.orderId = mSale!!.orderId
-            trans.isOffline = mSale!!.isOffline
-            trans.card = mCard
-            trans.timestamp = System.currentTimeMillis()
+            var trans = com.xpayworld.sdk.payment.data.Transaction()
+                trans.amount = mSale!!.amount.div(100.0)
+                trans.currency = mSale!!.currency
+                trans.orderId = mSale!!.orderId
+                trans.isOffline = mSale!!.isOffline
+                trans.card = mCard
+                trans.timestamp = System.currentTimeMillis()
 
             if (shouldCheckCardExpiry() != 0) {
                 mBBDeviceController?.sendOnlineProcessResult("8A023035")
@@ -588,14 +1045,17 @@ class XPayLink {
 
         }
 
-        override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?) {
+        override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?)
+        {
+            Log.w("XPayLink","onReturnTransactionResult, result:"+result.toString() )
             ProgressDialog.INSTANCE.dismiss()
             if (result == BBDeviceController.TransactionResult.APPROVED){
-                mListener?.onTransactionComplete()
+//                mListener?.onTransactionComplete()
+                mListener?.TransactionComplete()
                 return
             }
-            mListener?.onError(result?.ordinal, result?.name)
-
+//            mListener?.onError(result?.ordinal, result?.name)
+            mListener?.OnError(result?.ordinal, result?.name)
         }
 
         override fun onReturnReadTerminalSettingResult(p0: Hashtable<String, Any>?) {
@@ -625,7 +1085,10 @@ class XPayLink {
         }
 
         override fun onBTReturnScanResults(devices: MutableList<BluetoothDevice>?) {
-            mListener?.onBluetoothScanResult(devices)
+//            mListener?.onBluetoothScanResult(devices)
+//            mListener?.onBluetoothScanResult(devices)
+            mListener?.OnTerminalConnectedChanged(devices)
+            setBTConnection(device = devices!![0])
         }
 
         override fun onEnterStandbyMode() {
@@ -633,7 +1096,8 @@ class XPayLink {
         }
 
         override fun onPrintDataEnd() {
-            mListener?.onPrintComplete()
+//            mListener?.onPrintComplete()
+            mListener?.PrintComplete()
         }
 
         override fun onReturnDisableInputAmountResult(p0: Boolean) {
@@ -673,7 +1137,9 @@ class XPayLink {
         }
 
         override fun onPrintDataCancelled() {
-            mListener?.onError(XPayError.PRINT_CANCELLED.value,
+//            mListener?.onError(XPayError.PRINT_CANCELLED.value,
+//                XPayError.PRINT_CANCELLED.name)
+            mListener?.OnError(XPayError.PRINT_CANCELLED.value,
                 XPayError.PRINT_CANCELLED.name)
         }
 
@@ -705,6 +1171,7 @@ class XPayLink {
         }
 
         override fun onRequestSetAmount() {
+            Log.d("XPayLink", "onRequestSetAmount")
             setAmount()
         }
 
@@ -752,11 +1219,28 @@ class XPayLink {
         }
 
         override fun onSerialConnected() {
+            Log.w("XPayLink","onSerialConnected")
             startEMV()
         }
 
-        override fun onReturnBatchData(p0: String?) {
-
+        override fun onReturnBatchData(tlv: String?)
+        {
+            Log.w("XpayLink","onReturnBatchData(), tlv:"+tlv.toString() )
+            val decodeData = BBDeviceController.decodeTlv(tlv)
+            Log.w("XpayLink","onReturnBatchData(), decodeData:"+decodeData.toString() )
+//                mCard.emvICCData = decodeData["C2"].toString()
+//                mCard.expiryDate = decodeData["5F24"].toString()
+//                mCard.ksn = decodeData["C0"].toString()
+//                mCard.cardNumber = decodeData["5A"].toString()
+//                mCard.cardXNumber = decodeData["C4"].toString()
+//
+//                var trans = Transaction()
+//                trans.amount = mSale!!.amount.div(100.0)
+//                trans.currency = mSale!!.currency
+//                trans.orderId = mSale!!.orderId
+//                trans.isOffline = mSale!!.isOffline
+//                trans.card = mCard
+//                trans.timestamp = System.currentTimeMillis()
         }
 
         override fun onReturnEncryptDataResult(p0: Boolean, p1: Hashtable<String, String>?) {
@@ -786,7 +1270,11 @@ class XPayLink {
         override fun onReturnCancelCheckCardResult(isCancel: Boolean) {
             if (isCancel) {
                 ProgressDialog.INSTANCE.dismiss()
-                mListener?.onError(
+//                mListener?.onError(
+//                    XPayError.TXN_CANCELLED.value,
+//                    XPayError.TXN_CANCELLED.name
+//                )
+                mListener?.OnError(
                     XPayError.TXN_CANCELLED.value,
                     XPayError.TXN_CANCELLED.name
                 )
@@ -794,7 +1282,8 @@ class XPayLink {
         }
 
         override fun onBatteryLow(status: BBDeviceController.BatteryStatus?) {
-            mListener?.onError(status?.ordinal, status?.name)
+//            mListener?.onError(status?.ordinal, status?.name)
+            mListener?.OnError(status?.ordinal, status?.name)
         }
 
         override fun onBTScanTimeout() {
@@ -906,7 +1395,8 @@ class XPayLink {
 
         override fun onError(error: BBDeviceController.Error?, p1: String?) {
             ProgressDialog.INSTANCE.dismiss()
-            mListener?.onError(error?.ordinal, error?.name)
+//            mListener?.onError(error?.ordinal, error?.name)
+            mListener?.OnError(error?.ordinal, error?.name)
         }
 
         override fun onReturnAmountConfirmResult(p0: Boolean) {
