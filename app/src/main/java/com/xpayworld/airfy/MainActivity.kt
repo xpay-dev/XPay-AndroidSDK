@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.xpayworld.sdk.payment.*
+import com.xpayworld.sdk.payment.Currency
 import com.xpayworld.sdk.payment.utils.*
 import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.activity_main.*
@@ -22,63 +23,56 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
         XPayLink.INSTANCE.attach(this, this)
 
-        val saleData = Sale()
-            saleData.amount = 10000
-            saleData.connection = Connection.BLUETOOTH
-            saleData.currencyCode = 608
-            saleData.currency = "PHP"
-            saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
-            saleData.orderId = randomAlphaNumericString(30)
-            saleData.isOffline = true
-        //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
+//        val saleData = Sale()
+//            saleData.amount = 10000
+//            saleData.connection = Connection.BLUETOOTH
+//            saleData.currencyCode = 608
+//            saleData.currency = "PHP"
+//            saleData.cardMode = CardMode.SWIPE_OR_INSERT_OR_TAP
+//            saleData.orderId = randomAlphaNumericString(30)
+//            saleData.isOffline = true
+            //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
+        // CONNECT TO BLUETOOTH DEVICE
+        btn_connect.setOnClickListener {
+            XPayLink.INSTANCE.Connect()
+        }
+
+        // UPLOAD TRANSACTIONS
         btn_batch.visibility = View.INVISIBLE
         btn_batch.setOnClickListener {
-//            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
+            //            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
             val print = PrintDetails()
             print.data = genReceipt()
             print.numOfReceipt = 2
             XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
         }
 
-        // CONNECT TO BT
-        btn_connect.visibility = View.INVISIBLE
-        btn_connect.setOnClickListener {
+        // PRINT
+        btn_print.visibility = View.INVISIBLE
+        btn_print.setOnClickListener {
             // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
-            if (devices1?.count() != 0) {
-                XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
-            }
+            XPayLink.INSTANCE.PrintBegin()
         }
-
-//        val print = PrintDetails()
-//        print.data = genReceipt()
-//        print.numOfReceipt = 2
 
         // START TRANSACTION
         btn_start.visibility = View.INVISIBLE
         btn_start.setOnClickListener {
-//            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
-//            XPayLink.INSTANCE.startAction(ActionType.SALE(saleData))
-
-//            XPayLink.INSTANCE.ResetProperties()
-//                XPayLink.INSTANCE.setAmountPurchase(10000)
-//                XPayLink.INSTANCE.setCurrencyCode(840)
+            XPayLink.INSTANCE.ResetProperties()
+                XPayLink.INSTANCE.setAmountPurchase(99.99)
+                XPayLink.INSTANCE.setCurrencyCode(840)
 //                XPayLink.INSTANCE.setCurrency("USD")
-//                XPayLink.INSTANCE.setCardCaptureMethod(CardMode.SWIPE_OR_INSERT_OR_TAP)
-//                XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
-//            XPayLink.INSTANCE.Transaction()
-
-//            btn_connect.visibility = View.VISIBLE
-
-//            btn_batch.visibility = View.VISIBLE
+                XPayLink.INSTANCE.setCurrency(Currency.DOLLAR.value)
+                XPayLink.INSTANCE.setCardCaptureMethod(CardMode.INSERT)
+                XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
+            XPayLink.INSTANCE.Transaction()
         }
     }
 
-    //=====================================================================================
-    // XPay Callbacks
+//=====================================================================================
+//#region XPay Callbacks
 //    override fun onBluetoothScanResult(devices: MutableList<BluetoothDevice>?) {
 ////        devices1 = devices
 ////        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
@@ -100,7 +94,9 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 ////        textView.text = "Device ERROR  ${error}  : ${message} "
 ////        Log.e("ERROR", "${error} : ${message}")
 //    }
+//#endregion XPay Callbacks
 
+//#region Receipt Generator
     fun randomAlphaNumericString(desiredStrLength: Int): String {
         val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
         return (1..desiredStrLength)
@@ -124,8 +120,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         }
         try {
             val baos = ByteArrayOutputStream()
-            baos.write (INIT)
-            baos.write( POWER_ON)
+            baos.write(INIT)
+            baos.write(POWER_ON)
 
             baos.write(NEW_LINE)
             baos.write(CHAR_SPACING_0)
@@ -376,7 +372,7 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         }
         return null
     }
-
+//#endregion Receipt Generator
 
     //=====================================================================================
     // AirFi Callbacks
@@ -385,11 +381,18 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
         textView.text = "Hi AirFi"
     }
 
-    override fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+//    override fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+    override fun OnTerminalConnectedChanged(device: BluetoothDevice?)
     {
-        devices1 = devices
-        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
+//        devices1 = devices
+////        if (devices1?.count() != 0) {
+////            XPayLink.INSTANCE.setBTConnection(device = devices1!![0])
+////        }
+//        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
+
+        textView.text = "${device?.address}"
         btn_start.visibility = View.VISIBLE
+        btn_print.visibility = View.VISIBLE
     }
 
     override fun TransactionComplete()

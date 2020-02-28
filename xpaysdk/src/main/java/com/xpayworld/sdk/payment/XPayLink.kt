@@ -36,6 +36,21 @@ sealed class ActionType {
     object BATCH_UPLOAD : ActionType()
 }
 
+enum class Currency(val value: String) {
+    NONE("SPACE"),
+    DIRHAM("DIRHAM"),
+    DOLLAR("DOLLAR"),
+    EURO("EURO"),
+    NEW_SHEKEL("NEW_SHEKEL"),
+    POUND("POUND"),
+    RIYAL("RIYAL"),
+    RIYAL_2("RIYAL_2"),
+    RUPEE("RUPEE"),
+    WON("WON"),
+    YEN("YEN"),
+    YUAN("YUAN")
+}
+
 enum class CardMode(val value: Int) {
     SWIPE(0),
     INSERT(1),
@@ -47,7 +62,7 @@ enum class CardMode(val value: Int) {
 }
 
 class Sale {
-    var amount: Int = 0
+    var amount: Double = 0.0
     var currency: String = ""
     var currencyCode: Int = 0
     var orderId: String = ""
@@ -57,7 +72,8 @@ class Sale {
     var timeOut: Int? = 60
 }
 
-class PrintDetails{
+class PrintDetails
+{
     var numOfReceipt: Int = 1
     var timeOut: Int = 60
     var connection: Connection? = Connection.BLUETOOTH
@@ -75,6 +91,7 @@ interface PaymentServiceListener
 //    fun onError(error: Int?, message: String?)
 
 
+//#region Callbacks
     // AirFi requests
     fun InitialiseComplete()
     fun OnError(error: Int?, message: String?)
@@ -83,15 +100,15 @@ interface PaymentServiceListener
 //    fun OnPrintReceipt()
 //    fun GetStatusComplete()
     fun TransactionComplete()
-    fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+//    fun OnTerminalConnectedChanged(devices: MutableList<BluetoothDevice>?)
+    fun OnTerminalConnectedChanged(device: BluetoothDevice?)
     fun PrintComplete()
+//#endregion Callbacks
 }
 
-
-
 @Suppress("INCOMPATIBLE_ENUM_COMPARISON")
-class XPayLink {
-
+class XPayLink
+{
     private val CARD_MODE: BBDeviceController.CheckCardMode? = null
     private val DEVICE_NAMES = arrayOf("WP")
 
@@ -130,7 +147,8 @@ class XPayLink {
         var INSTANCE: XPayLink = XPayLink()
     }
 
-    fun attach(mContext: Context, listener: PaymentServiceListener) {
+    fun attach(mContext: Context, listener: PaymentServiceListener)
+    {
         CONTEXT = mContext
         mListener = listener
         mDeviceListener = BBPOSDeviceListener()
@@ -138,8 +156,6 @@ class XPayLink {
         BBDeviceController.setDebugLogEnabled(true)
 
         mListener?.InitialiseComplete()
-
-        mBBDeviceController?.startBTScan(DEVICE_NAMES,60)
     }
 
     /**
@@ -440,50 +456,165 @@ class XPayLink {
         Log.w("XPayLink","private startEMV")
         mBBDeviceController?.getDeviceInfo()
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
-        val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
-        data["emvOption"] = BBDeviceController.EmvOption.START
-        // data["orderID"] = "${mSale?.orderId}"
 
-        data["orderID"] = "0123456789ABCDEF0123456789ABCD"
-        data["randomNumber"] = "012345"
-        data["checkCardMode"] = valueOf(value = mSale?.cardMode!!.ordinal)
-        // Terminal Time
-        val terminalTime = SimpleDateFormat("yyMMddHHmmss").format(Calendar.getInstance().time)
-        data["terminalTime"] = terminalTime
+        val data: Hashtable<String, Any> = Hashtable() //define empty hashmap
+            data["emvOption"] = BBDeviceController.EmvOption.START
+
+        // TODO: fix random alphanumeric number causing error in app
+//            data["orderID"] = "0123456789ABCDEF0123456789ABCD"
+            data["orderID"] = mSale?.orderId
+            Log.w("XPayLink","private startEMV, data[\"orderID\"]:"+data["orderID"].toString() )
+
+//            data["randomNumber"] = "012345"
+
+            data["checkCardMode"] = valueOf(value = mSale?.cardMode!!.ordinal)
+            Log.w("XPayLink","private startEMV, data[\"checkCardMode\"]:"+data["checkCardMode"].toString() )
+
+            data["terminalTime"] = SimpleDateFormat("yyMMddHHmmss").format(Calendar.getInstance().time)
+            Log.w("XPayLink","private startEMV, data[\"checkCardMode\"]:"+data["terminalTime"].toString() )
+
         mBBDeviceController?.startEmv(data)
+    }
+
+    fun getCurrencyCharacterByString(char:String?):CurrencyCharacter
+    {
+        var currChar:CurrencyCharacter=CurrencyCharacter.SPACE
+
+        when(char)
+        {
+            Currency.DIRHAM.value -> { currChar = CurrencyCharacter.DIRHAM }
+            Currency.DOLLAR.value -> { currChar = CurrencyCharacter.DOLLAR }
+            Currency.EURO.value -> { currChar = CurrencyCharacter.EURO }
+            Currency.NEW_SHEKEL.value -> { currChar = CurrencyCharacter.NEW_SHEKEL }
+            Currency.POUND.value -> { currChar = CurrencyCharacter.POUND }
+            Currency.RIYAL.value -> { currChar = CurrencyCharacter.RIYAL }
+            Currency.RIYAL_2.value -> { currChar = CurrencyCharacter.RIYAL_2 }
+            Currency.RUPEE.value -> { currChar = CurrencyCharacter.RUPEE }
+            Currency.WON.value -> { currChar = CurrencyCharacter.WON }
+            Currency.YEN.value -> { currChar = CurrencyCharacter.YEN }
+            Currency.YUAN.value -> { currChar = CurrencyCharacter.YUAN }
+            else -> { currChar = CurrencyCharacter.SPACE }
+        }
+
+
+        return currChar
+    }
+
+    fun getCurrencyCharacterByLetter(char:String?):CurrencyCharacter
+    {
+        var currChar:CurrencyCharacter=CurrencyCharacter.SPACE
+
+        when(char?.toUpperCase())
+        {
+            "A"->{ currChar = CurrencyCharacter.A }
+            "B"->{ currChar = CurrencyCharacter.B }
+            "C"->{ currChar = CurrencyCharacter.C }
+            "D"->{ currChar = CurrencyCharacter.D }
+            "E"->{ currChar = CurrencyCharacter.E }
+            "F"->{ currChar = CurrencyCharacter.F }
+            "G"->{ currChar = CurrencyCharacter.G }
+            "H"->{ currChar = CurrencyCharacter.H }
+            "I"->{ currChar = CurrencyCharacter.I }
+            "J"->{ currChar = CurrencyCharacter.J }
+            "K"->{ currChar = CurrencyCharacter.K }
+            "L"->{ currChar = CurrencyCharacter.L }
+            "M"->{ currChar = CurrencyCharacter.M }
+            "N"->{ currChar = CurrencyCharacter.N }
+            "O"->{ currChar = CurrencyCharacter.O }
+            "P"->{ currChar = CurrencyCharacter.P }
+            "Q"->{ currChar = CurrencyCharacter.Q }
+            "R"->{ currChar = CurrencyCharacter.R }
+            "S"->{ currChar = CurrencyCharacter.S }
+            "T"->{ currChar = CurrencyCharacter.T }
+            "U"->{ currChar = CurrencyCharacter.U }
+            "V"->{ currChar = CurrencyCharacter.V }
+            "W"->{ currChar = CurrencyCharacter.W }
+            "X"->{ currChar = CurrencyCharacter.X }
+            "Y"->{ currChar = CurrencyCharacter.Y }
+            "Z"->{ currChar = CurrencyCharacter.Z }
+        }
+
+
+        return currChar
     }
 
     private fun setAmount()
     {
         Log.w("XPayLink","setAmount")
+        Log.w("XPayLink","setAmount, mSale!!.amount:"
+                +mSale!!.amount.toString() )
+
+        Log.w("XPayLink","setAmount, mSale?.currency:"
+                + mSale?.currency.toString() )
+
         ProgressDialog.INSTANCE.show()
         ProgressDialog.INSTANCE.message("CONFIRM AMOUNT")
 
         val input: Hashtable<String, Any> = Hashtable() //define empty hashmap
-        // Currency Sign
-        val currencyCharacter = arrayOf(
-            CurrencyCharacter.P,
-            CurrencyCharacter.H,
-            CurrencyCharacter.P
-        )
 
-        println(currencyCharacter[0].value)
+
+        // Currency Sign
+//        val currencyCharacter = arrayOf(
+//            CurrencyCharacter.P,
+//            CurrencyCharacter.H,
+//            CurrencyCharacter.P
+//        )
+//        println(currencyCharacter[0])
+
 
         // Configure Amount
-        input.put("amount", "${ mSale!!.amount.div(100.0)}")
+//        input.put("amount", "${ mSale!!.amount.div(100.0)}")
+        input.put("amount", "${ mSale?.amount}")
         input.put("transactionType", BBDeviceController.TransactionType.GOODS)
         input.put("currencyCode", "${mSale?.currencyCode}")
 
-        if (mSale?.connection == Connection.BLUETOOTH) {
-            input.put("currencyCharacters", currencyCharacter)
+        if (mSale?.connection == Connection.BLUETOOTH)
+        {
+//            input.put("currencyCharacters", currencyCharacter)
+            if(getCurrencyCharacterByString(mSale?.currency)==CurrencyCharacter.SPACE)
+            {
+                val currencyCode = mSale?.currency?.split("")
+                Log.w("XPayLink","setAmount, currencyCode:"
+                        +currencyCode.toString() )
+                val currencyCharacter = arrayOf(
+                    getCurrencyCharacterByLetter(currencyCode?.get(1)),
+                    getCurrencyCharacterByLetter(currencyCode?.get(2)),
+                    getCurrencyCharacterByLetter(currencyCode?.get(3))
+                )
+                input.put("currencyCharacters", currencyCharacter)
+            }
+            else
+            {
+                val currencyCharacter = arrayOf(
+                    getCurrencyCharacterByString(mSale?.currency)
+                )
+                input.put("currencyCharacters", currencyCharacter )
+            }
         }
 
         mBBDeviceController?.setAmount(input)
     }
 
+//#region Public calls
 //================================================================================================//
 //============================================ AirFi =============================================//
 //================================================================================================//
+    /**
+     * will connect to the first paired device available
+     */
+    fun Connect()
+    {
+        mBBDeviceController?.startBTScan(DEVICE_NAMES,60)
+    }
+
+    /**
+     * disconnects a connected device
+     */
+    fun Disconnect()
+    {
+        mBBDeviceController?.disconnectBT()
+    }
+
     /**
      * This is to ensure no residual data from a previous event
      */
@@ -524,9 +655,11 @@ class XPayLink {
     }
 
     // TODO: set to decimal
-    fun setAmountPurchase(transactionAmount:Int)
+    fun setAmountPurchase(transactionAmount:Double)
     {
         mSale?.amount = transactionAmount
+        Log.w("XPayLink","setAmountPurchase(), mSale?.amount:"
+                + mSale?.amount.toString() )
     }
 
     /**
@@ -537,15 +670,20 @@ class XPayLink {
     fun setCurrencyCode(currencyCode:Int)
     {
         mSale?.currencyCode = currencyCode
+        Log.w("XPayLink","setAmountPurchase(), mSale?.currencyCode:"
+                + mSale?.currencyCode.toString() )
     }
 
     /**
-     * can be obtained from https://en.wikipedia.org/wiki/ISO_4217
+     * can be obtained from Currency Enum w/c are provided by the terminal or
+     * the 3 character code from http://www.allembassies.com/currency_codes_by_3-letter_code.htm
      * @param currencyName [String]
      */
     fun setCurrency(currencyName:String)
     {
         mSale?.currency = currencyName
+        Log.w("XPayLink","setAmountPurchase(), mSale?.currency:"
+                + mSale?.currency.toString() )
     }
 
     /**
@@ -554,6 +692,8 @@ class XPayLink {
     fun setCardCaptureMethod(cardCaptureMode:CardMode)
     {
         mSale?.cardMode = cardCaptureMode
+        Log.w("XPayLink","setAmountPurchase(), mSale?.cardMode:"
+                + mSale?.cardMode.toString() )
     }
 
     // TODO: what is this for?
@@ -597,10 +737,279 @@ class XPayLink {
     fun setLineSpacing(fontSize:Int) {}
     fun setReceipt(printData:String){}
 
+//    private fun genReceipt(): ByteArray?
+//    {
+//        val lineWidth = 384
+//        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+//        var singleLine = ""
+//        for (i in 0 until size0NoEmphasizeLineWidth) {
+//            singleLine += "-"
+//        }
+//        var doubleLine = ""
+//        for (i in 0 until size0NoEmphasizeLineWidth) {
+//            doubleLine += "="
+//        }
+//        try {
+//            val baos = ByteArrayOutputStream()
+//            baos.write (INIT)
+//            baos.write( POWER_ON)
+//
+//            baos.write(NEW_LINE)
+//            baos.write(CHAR_SPACING_0)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(FONT_5X12)
+//            baos.write("Suite 1602, 16/F, Tower 2".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write("Nina Tower, No 8 Yeung Uk Road".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write("Tsuen Wan, N.T., Hong Kong".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_1)
+//            baos.write(FONT_5X12)
+//            baos.write("OFFICIAL RECEIPT".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(FONT_10X18)
+//            baos.write("Form No. 2524".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(FONT_10X18)
+//            baos.write("ROR NO ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("ROR2014-000556-000029".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("DATE/TIME ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("08/20/2014 10:42:46 AM".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("CHAN TAI MAN".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("BIR FORM NO : ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("0605".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("TYPE : ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("AP".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("PERIOD COVERED : ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("2014-8-20".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("ASSESSMENT NO : ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("885".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("DUE DATE : ".toByteArray())
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("2014-8-20".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            var fontSize = 0
+//            var fontWidth = 10 * (fontSize + 1) + (fontSize + 1)
+//            var s1 = "PARTICULARS"
+//            var s2 = "AMOUNT"
+//            var s = s1
+//            var numOfCharacterPerLine = lineWidth / fontWidth
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            fontSize = 0
+//            fontWidth = 10 * (fontSize + 1)
+//            s1 = "BASIC"
+//            s2 = "100.00"
+//            s = s1
+//            numOfCharacterPerLine = lineWidth / fontWidth
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "    SUBCHANGE"
+//            s2 = "500.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "    INTEREST"
+//            s2 = "0.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "    COMPROMISE"
+//            s2 = "0.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "TOTAL"
+//            s2 = "500.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "TOTAL AMOUNT DUE"
+//            s2 = "600.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(FONT_10X18)
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write(doubleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "TOTAL AMOUNT PAID"
+//            s2 = "600.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(FONT_10X18)
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("SIX HUNDRED DOLLARS ONLY".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_10X18)
+//            baos.write("MANNER OF PAYMENT".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(" ACCOUNTS RECEIVABLE".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("TYPE OF PAYMENT".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(" FULL".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("MODE OF PAYMENT".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("  CASH".toByteArray())
+//            baos.write(NEW_LINE)
+//            s1 = "  AMOUNT"
+//            s2 = "600.00"
+//            s = s1
+//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
+//                s += " "
+//            }
+//            s += s2
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(s.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write("REMARKS".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("TEST".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(ALIGN_CENTER)
+//            baos.write(FONT_SIZE_1)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(FONT_8X12)
+//            baos.write("CARDHOLDER'S COPY".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(singleLine.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(ALIGN_CENTER)
+//            baos.write(FONT_5X12)
+//            baos.write("This is to certify that the amount indicated herein has".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write("been received by the undersigned".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(FONT_10X18)
+//            baos.write("CHAN SIU MING".toByteArray())
+//            baos.write(NEW_LINE)
+//            val barcode = "B B P O S"
+//            val barcodeData =
+//                Hashtable<String, String>()
+//            barcodeData["barcodeDataString"] = barcode
+//            barcodeData["barcodeHeight"] = "" + 50
+//            barcodeData["barcodeType"] = "128"
+//            val barcodeCommand: ByteArray =  getBarcodeCommand(barcodeData)
+//            baos.write(barcodeCommand)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write(FONT_10X18)
+//            baos.write(NEW_LINE)
+//            baos.write(barcode.toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(POWER_OFF)
+//            return baos.toByteArray()
+//        } catch (e: Exception) {
+//            e.printStackTrace()
+//        }
+//        return null
+//    }
+
     private fun genReceipt(): ByteArray?
     {
         val lineWidth = 384
-        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+//        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+        val size0NoEmphasizeLineWidth = 384 / 9 //line width / font width
         var singleLine = ""
         for (i in 0 until size0NoEmphasizeLineWidth) {
             singleLine += "-"
@@ -614,249 +1023,199 @@ class XPayLink {
             baos.write (INIT)
             baos.write( POWER_ON)
 
-            baos.write(NEW_LINE)
-            baos.write(CHAR_SPACING_0)
-            baos.write(FONT_SIZE_0)
-            baos.write(EMPHASIZE_ON)
-            baos.write(FONT_5X12)
-            baos.write("Suite 1602, 16/F, Tower 2".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write("Nina Tower, No 8 Yeung Uk Road".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write("Tsuen Wan, N.T., Hong Kong".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_SIZE_1)
-            baos.write(FONT_5X12)
-            baos.write("OFFICIAL RECEIPT".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_SIZE_0)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
-            baos.write("Form No. 2524".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write(singleLine.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(ALIGN_LEFT)
-            baos.write(FONT_10X18)
-            baos.write("ROR NO ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("ROR2014-000556-000029".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("DATE/TIME ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("08/20/2014 10:42:46 AM".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_8X12)
-            baos.write(singleLine.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_10X18)
-            baos.write(EMPHASIZE_ON)
-            baos.write("CHAN TAI MAN".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("BIR FORM NO : ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("0605".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("TYPE : ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("AP".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("PERIOD COVERED : ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("2014-8-20".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("ASSESSMENT NO : ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("885".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("DUE DATE : ".toByteArray())
-            baos.write(EMPHASIZE_ON)
-            baos.write("2014-8-20".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            var fontSize = 0
-            var fontWidth = 10 * (fontSize + 1) + (fontSize + 1)
-            var s1 = "PARTICULARS"
-            var s2 = "AMOUNT"
-            var s = s1
-            var numOfCharacterPerLine = lineWidth / fontWidth
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            fontSize = 0
-            fontWidth = 10 * (fontSize + 1)
-            s1 = "BASIC"
-            s2 = "100.00"
-            s = s1
-            numOfCharacterPerLine = lineWidth / fontWidth
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(EMPHASIZE_OFF)
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "    SUBCHANGE"
-            s2 = "500.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "    INTEREST"
-            s2 = "0.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "    COMPROMISE"
-            s2 = "0.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "TOTAL"
-            s2 = "500.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write(singleLine.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "TOTAL AMOUNT DUE"
-            s2 = "600.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(FONT_10X18)
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write(doubleLine.toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "TOTAL AMOUNT PAID"
-            s2 = "600.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(FONT_10X18)
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_ON)
-            baos.write("SIX HUNDRED DOLLARS ONLY".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_8X12)
-            baos.write(singleLine.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(FONT_10X18)
-            baos.write("MANNER OF PAYMENT".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_ON)
-            baos.write(" ACCOUNTS RECEIVABLE".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("TYPE OF PAYMENT".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_ON)
-            baos.write(" FULL".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("MODE OF PAYMENT".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_ON)
-            baos.write("  CASH".toByteArray())
-            baos.write(NEW_LINE)
-            s1 = "  AMOUNT"
-            s2 = "600.00"
-            s = s1
-            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-                s += " "
-            }
-            s += s2
-            baos.write(EMPHASIZE_OFF)
-            baos.write(s.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write("REMARKS".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_ON)
-            baos.write("TEST".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_8X12)
-            baos.write(singleLine.toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(ALIGN_CENTER)
-            baos.write(FONT_SIZE_1)
-            baos.write(EMPHASIZE_ON)
-            baos.write(FONT_8X12)
-            baos.write("CARDHOLDER'S COPY".toByteArray())
+            // just printing a blank string for fix of double printing on first run
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write( "".toByteArray() )
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write( "".toByteArray() )
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write( singleLine.toByteArray() )
+
             baos.write(NEW_LINE)
             baos.write(ALIGN_LEFT)
             baos.write(FONT_SIZE_0)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(singleLine.toByteArray())
+            baos.write(EMPHASIZE_ON)
+            baos.write(FONT_8X12)
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+            baos.write(NEW_LINE)
+            baos.write( ".".toByteArray() )
+        //==========================================================================================
+        // write beyond this point
+
+            baos.write(ALIGN_CENTER)
+            baos.write(NEW_LINE)
+            baos.write("SCOOT".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+
             baos.write(NEW_LINE)
             baos.write(ALIGN_CENTER)
-            baos.write(FONT_5X12)
-            baos.write("This is to certify that the amount indicated herein has".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write("been received by the undersigned".toByteArray())
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
-            baos.write(NEW_LINE)
             baos.write(EMPHASIZE_ON)
-            baos.write(FONT_10X18)
-            baos.write("CHAN SIU MING".toByteArray())
+            baos.write("normal sale".toByteArray())
+
             baos.write(NEW_LINE)
-            val barcode = "B B P O S"
-            val barcodeData =
-                Hashtable<String, String>()
-            barcodeData["barcodeDataString"] = barcode
-            barcodeData["barcodeHeight"] = "" + 50
-            barcodeData["barcodeType"] = "128"
-            val barcodeCommand: ByteArray =  getBarcodeCommand(barcodeData)
-            baos.write(barcodeCommand)
+            baos.write(ALIGN_CENTER)
             baos.write(EMPHASIZE_ON)
+            baos.write("passenger copy".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
             baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Tablet:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("1819D67264CC".toByteArray())
+
             baos.write(NEW_LINE)
-            baos.write(barcode.toByteArray())
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Ticket Number:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("2".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Flight Date:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("2020-02-12".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Flight Number:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TR147".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Flight Route:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("ANR-BRU".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Crew:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("AIRFI-TEST".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("Order No:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("8dbac0fc-e0ea-4c67-82a6".toByteArray())
+
+            baos.write(NEW_LINE)
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("1 Tiger Beer    ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("SGD 8.00".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("1 HOT MEAL COMBO    ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("SGD 15.00".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("     -  Coca Cola Regular".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("     -  Oriental Treasure Rice".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_8X12)
+            baos.write(singleLine.toByteArray())
+
+            baos.write(NEW_LINE)
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("TOTAL:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("SGD  23.00".toByteArray())
+
+            baos.write(NEW_LINE)
+            baos.write(FONT_SIZE_0)
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(FONT_10X18)
+            baos.write(EMPHASIZE_OFF)
+            baos.write("CASH:     ".toByteArray())
+            baos.write(EMPHASIZE_OFF)
+            baos.write("SGD  23.00".toByteArray())
+
+        //==========================================================================================
+        // don't write beyond this point
+
             baos.write(NEW_LINE)
             baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write(NEW_LINE)
+            baos.write("".toByteArray())
+
             baos.write(POWER_OFF)
+
             return baos.toByteArray()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -866,12 +1225,13 @@ class XPayLink {
     fun PrintBegin()
     {
         val print = PrintDetails()
-        print.data = genReceipt()
-        print.numOfReceipt = 2
-        startAction(ActionType.PRINT(print))
+            print.data = genReceipt()
+            print.numOfReceipt = 1
+            startAction(ActionType.PRINT(print))
     }
     fun PrintText() {} // TODO: what is this for?
     fun PrintEnd() {}
+//#endregion Public calls
 //================================================================================================//
 //============================================ AirFi =============================================//
 //================================================================================================//
@@ -919,7 +1279,9 @@ class XPayLink {
 
         override fun onBTConnected(p0: BluetoothDevice?)
         {
-            Log.w("XPayLink","onBTConnected")
+            Log.w("XPayLink","onBTConnected, p0:" + p0.toString() )
+            mSelectedDevice = p0
+            mListener?.OnTerminalConnectedChanged(p0)
 //            when (mActionType)
 //            {
 //                is ActionType.SALE -> {
@@ -957,7 +1319,8 @@ class XPayLink {
                 mCard.cardXNumber = decodeData["C4"].toString()
 
             var trans = com.xpayworld.sdk.payment.data.Transaction()
-                trans.amount = mSale!!.amount.div(100.0)
+//                trans.amount = mSale!!.amount.div(100.0)
+                trans.amount = mSale!!.amount
                 trans.currency = mSale!!.currency
                 trans.orderId = mSale!!.orderId
                 trans.isOffline = mSale!!.isOffline
@@ -1085,9 +1448,10 @@ class XPayLink {
         }
 
         override fun onBTReturnScanResults(devices: MutableList<BluetoothDevice>?) {
+            Log.w("XPayLink","onBTReturnScanResults, devices:"+devices.toString() )
 //            mListener?.onBluetoothScanResult(devices)
 //            mListener?.onBluetoothScanResult(devices)
-            mListener?.OnTerminalConnectedChanged(devices)
+//            mListener?.OnTerminalConnectedChanged(devices)
             setBTConnection(device = devices!![0])
         }
 
