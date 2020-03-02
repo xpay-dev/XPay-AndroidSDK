@@ -72,6 +72,12 @@ class Sale {
     var timeOut: Int? = 60
 }
 
+class PrintOptions {
+    var fontSize: Int = 1
+    var characterSpacing: Int = 0
+    var lineSpacing: Int = 0
+}
+
 class PrintDetails
 {
     var numOfReceipt: Int = 1
@@ -117,6 +123,7 @@ class XPayLink
     private var mSelectedDevice: BluetoothDevice? = null
 
     private var mSale: Sale? = null
+    private var mPrintOptions: PrintOptions? = null
     private var mPrintDetails: PrintDetails? = null
     private var mActionType: ActionType? = null
     private var mListener: PaymentServiceListener? = null
@@ -127,6 +134,8 @@ class XPayLink
     private var mFirmwareVersion: String? = ""
     private var mBatterLevel: String? = ""
     private var mBatterPercentage: String? = ""
+
+    private var mBaosPrintData:ByteArrayOutputStream? = null
 
     private val mTransactionRepo: TransactionRepository by lazy {
         TransactionRepository.getInstance(
@@ -169,7 +178,8 @@ class XPayLink
      *                          `BLUETOOTH` and `SERIAL`
      * @param cardMode           BBDeviceController.CheckCardMode
      */
-    fun startAction(type: ActionType) {
+    fun startAction(type: ActionType)
+    {
         mActionType = type
         when (type)
         {
@@ -209,7 +219,7 @@ class XPayLink
                         ProgressDialog.INSTANCE.attach(CONTEXT)
                         if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
                             startEMV()
-                            return
+                            return@startAction
                         }
                         mBBDeviceController?.startBTScan(DEVICE_NAMES, mSale?.timeOut!!)
                     }
@@ -227,7 +237,7 @@ class XPayLink
                         if (mBBDeviceController?.connectionMode == BBDeviceController.ConnectionMode.BLUETOOTH) {
 
                             startPrinter()
-                            return
+                            return@startAction
                         }
                         mBBDeviceController?.startBTScan(DEVICE_NAMES, mPrintDetails?.timeOut!!)
                     }
@@ -296,6 +306,7 @@ class XPayLink
 
         // Refresh Session
         val pin = SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN)
+        Log.d("XPayLink","processBatchUpload, pin:"+pin)
         API.INSTANCE.callLogin(pin) {
             uploadTransaction()
         }
@@ -303,7 +314,6 @@ class XPayLink
 
     private fun startPrinter() {
         mBBDeviceController?.startPrint(mPrintDetails!!.numOfReceipt,mPrintDetails!!.timeOut)
-        mBBDeviceController?.sendPrintData(mPrintDetails?.data)
     }
 
     private fun uploadTransaction()
@@ -376,10 +386,14 @@ class XPayLink
     }
 
     private fun isActivated(): Boolean {
+        Log.w("XPayLink","isActivated(), SharedPref.INSTANCE.readMessage(PosWS.PREF_ACTIVATION)):"
+            +SharedPref.INSTANCE.readMessage(PosWS.PREF_ACTIVATION))
         return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
     }
 
     private fun hasEnteredPin(): Boolean {
+        Log.w("XPayLink","isActivated(), SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN):"
+                +SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN))
         return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
 
@@ -402,15 +416,15 @@ class XPayLink
 
     private fun showEnterPin() {
         val dialog = PopupDialog()
-        dialog.buttonNegative = "Cancel"
-        dialog.buttonPositive = "Ok"
-        dialog.title = "Enter Pin code"
-        dialog.hasEditText = true
-        dialog.show(callback = { buttonId ->
-            if (buttonId == 1) {
-                API.INSTANCE.callLogin(dialog.text!!)
-            }
-        })
+            dialog.buttonNegative = "Cancel"
+            dialog.buttonPositive = "Ok"
+            dialog.title = "Enter Pin code"
+            dialog.hasEditText = true
+            dialog.show(callback = { buttonId ->
+                if (buttonId == 1) {
+                    API.INSTANCE.callLogin(dialog.text!!)
+                }
+            })
     }
 
     private fun shouldCheckCardExpiry() : Int
@@ -461,7 +475,7 @@ class XPayLink
             data["emvOption"] = BBDeviceController.EmvOption.START
 
         // TODO: fix random alphanumeric number causing error in app
-//            data["orderID"] = "0123456789ABCDEF0123456789ABCD"
+//            data["orderID"] = "0123456789ABCDEF0123456789ABCDEF"
             data["orderID"] = mSale?.orderId
             Log.w("XPayLink","private startEMV, data[\"orderID\"]:"+data["orderID"].toString() )
 
@@ -595,6 +609,10 @@ class XPayLink
         mBBDeviceController?.setAmount(input)
     }
 
+    private fun IntToLeadingZeroByte(value:Int):String
+    {
+        return String.format("0x%1$02X",value)
+    }
 //#region Public calls
 //================================================================================================//
 //============================================ AirFi =============================================//
@@ -604,6 +622,8 @@ class XPayLink
      */
     fun Connect()
     {
+        IntToLeadingZeroByte(255)
+//        Log.w("XPayLink","Connect(), str:"+str)
         mBBDeviceController?.startBTScan(DEVICE_NAMES,60)
     }
 
@@ -729,14 +749,47 @@ class XPayLink
 // For Uploading
     fun UploadTransaction()
     {
-        startAction(ActionType.PIN)
+        Log.w("XPayLink","UploadTransaction()")
+        startAction(ActionType.BATCH_UPLOAD)
     }
 
 // For Printing
-    fun setFontSize(fontSize:Int) {}
-    fun setLineSpacing(fontSize:Int) {}
-    fun setReceipt(printData:String){}
+    fun setFontSize(fontSize:Int)
+    {
+        mPrintOptions?.fontSize = fontSize
+    }
+    fun setCharacterSpacing(charSpace:Int)
+    {
+        mPrintOptions?.characterSpacing = charSpace
+    }
+    fun setLineSpacing(lineSpace:Int)
+    {
+        mPrintOptions?.lineSpacing = lineSpace
+    }
+    fun setReceipt(printData:String)
+    {
+        val baos = ByteArrayOutputStream()
 
+        baos.write(INIT)
+        baos.write(POWER_ON)
+
+        baos.write( FONT_SIZE_1 )
+
+        baos.write(byteArrayOf(0x1B, 0x20, mPrintOptions?.characterSpacing!!.toByte() ))//char spacing
+        baos.write(byteArrayOf(0x1B, 0x33, mPrintOptions?.lineSpacing!!.toByte() ))//line spacing
+
+        val _arrNewLineDelimitedData = printData.split("\n")
+        _arrNewLineDelimitedData.forEach { line ->
+            baos.write(NEW_LINE)
+            baos.write(line.toByteArray())
+        }
+
+        baos.write(POWER_OFF)
+
+        mBaosPrintData = baos
+    }
+
+//#region Receipt Printing Guide
 //    private fun genReceipt(): ByteArray?
 //    {
 //        val lineWidth = 384
@@ -1004,6 +1057,8 @@ class XPayLink
 //        }
 //        return null
 //    }
+//#endregion Receipt Printing Guide
+
 
     private fun genReceipt(): ByteArray?
     {
@@ -1020,39 +1075,19 @@ class XPayLink
         }
         try {
             val baos = ByteArrayOutputStream()
-            baos.write (INIT)
-            baos.write( POWER_ON)
+            baos.write(INIT)
+            baos.write(POWER_ON)
 
             // just printing a blank string for fix of double printing on first run
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write( "".toByteArray() )
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write( "".toByteArray() )
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write( singleLine.toByteArray() )
-
             baos.write(NEW_LINE)
-            baos.write(ALIGN_LEFT)
-            baos.write(FONT_SIZE_0)
-            baos.write(EMPHASIZE_ON)
             baos.write(FONT_8X12)
+            baos.write( "".toByteArray() )
             baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
+            baos.write(FONT_8X12)
+            baos.write( "".toByteArray() )
             baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write( ".".toByteArray() )
+            baos.write(FONT_8X12)
+            baos.write( singleLine.toByteArray() )
         //==========================================================================================
         // write beyond this point
 
@@ -1225,12 +1260,27 @@ class XPayLink
     fun PrintBegin()
     {
         val print = PrintDetails()
-            print.data = genReceipt()
+//            print.data = genReceipt()
+            print.data = mBaosPrintData!!.toByteArray()
             print.numOfReceipt = 1
             startAction(ActionType.PRINT(print))
     }
     fun PrintText() {} // TODO: what is this for?
     fun PrintEnd() {}
+
+    fun generateOrderID():String
+    {
+        val charPool: List<Char> = ('A'..'F') + ('0'..'9')
+        return (1..30)
+            .map { kotlin.random.Random.nextInt(0, charPool.size) }
+            .map(charPool::get)
+            .joinToString("")
+    }
+
+    fun getOrderID():String
+    {
+        return mSale!!.orderId
+    }
 //#endregion Public calls
 //================================================================================================//
 //============================================ AirFi =============================================//
@@ -1266,7 +1316,7 @@ class XPayLink
         }
 
         override fun onReturnPrintResult(p0: BBDeviceController.PrintResult?) {
-
+            mListener?.PrintComplete()
         }
 
         override fun onReturnDisableAccountSelectionResult(p0: Boolean) {
@@ -1281,6 +1331,7 @@ class XPayLink
         {
             Log.w("XPayLink","onBTConnected, p0:" + p0.toString() )
             mSelectedDevice = p0
+            mPrintOptions = PrintOptions()
             mListener?.OnTerminalConnectedChanged(p0)
 //            when (mActionType)
 //            {

@@ -40,20 +40,50 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
             XPayLink.INSTANCE.Connect()
         }
 
+        btn_pin.setOnClickListener {
+            XPayLink.INSTANCE.ShowPinEntry()
+        }
+
         // UPLOAD TRANSACTIONS
         btn_batch.visibility = View.INVISIBLE
         btn_batch.setOnClickListener {
-            //            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)
-            val print = PrintDetails()
-            print.data = genReceipt()
-            print.numOfReceipt = 2
-            XPayLink.INSTANCE.startAction(ActionType.PRINT(print))
+//            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)v
+            XPayLink.INSTANCE.UploadTransaction()
         }
 
         // PRINT
         btn_print.visibility = View.INVISIBLE
         btn_print.setOnClickListener {
             // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+//            val sReceipt = "       SCOOT        \n"+
+//            "\n"+
+//            "\nnormal sale"+
+//            "\npassenger copy"+
+//            "\n\n"+
+//            "Tablet: jhafkjagfkjafakjdhg \n"+
+//            "Ticket Number: 71615471674617 \n"+
+//            "Flight Date: 2020-02-12 \n"+
+//            "Flight Route: ANR-BRU \n"+
+//            "Crew: AIRFI-TEST \n"+
+//            "Order No: 6336336289902 \n"+
+//            "\n"+
+//            "1 Tiger Beer           SGD 8.00 \n"+
+//            "1 HOT MEAL COMBO       SGD 15.00 \n"+
+//            "   -   Coca Cola Regular \n"+
+//            "   -   Oriental Treasure Rice \n"+
+//            "------------------------------------------------------\n"+
+//            "\n\n"+
+//            "TOTAL:         SGD 23.00 \n"+
+//            "CASH:          SGD 23.00"+
+//            "\n\n\n\n\n\n\n"
+
+            val sReceipt = "       SCOOT        \n"+
+                    "       SCOOT        \n"
+
+            XPayLink.INSTANCE.setCharacterSpacing(2)
+            XPayLink.INSTANCE.setLineSpacing(2)
+
+            XPayLink.INSTANCE.setReceipt(sReceipt)
             XPayLink.INSTANCE.PrintBegin()
         }
 
@@ -97,8 +127,9 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 //#endregion XPay Callbacks
 
 //#region Receipt Generator
-    fun randomAlphaNumericString(desiredStrLength: Int): String {
-        val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    fun randomAlphaNumericString(desiredStrLength: Int): String
+    {
+        val charPool: List<Char> = ('A'..'F') + ('0'..'9')
         return (1..desiredStrLength)
             .map { kotlin.random.Random.nextInt(0, charPool.size) }
             .map(charPool::get)

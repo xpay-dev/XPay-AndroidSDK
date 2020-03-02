@@ -88,8 +88,9 @@ class API {
             )
     }
 
-    fun callLogin(pinCode: String, callback: (() -> Unit)? = null) {
-
+    fun callLogin(pinCode: String, callback: (() -> Unit)? = null)
+    {
+        Log.w("API","callLogin()")
         var data = Login()
         data.pin = pinCode
 
@@ -139,6 +140,7 @@ class API {
         callback: ((response: Any,
                     purchase: Transaction) -> Unit)
     ) {
+        Log.w("API","callTransaction")
         val data = PurchaseTransaction()
         data.processOffline = txn.isOffline
         data.attach(txn)
