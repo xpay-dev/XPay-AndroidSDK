@@ -1,5 +1,7 @@
 package com.xpayworld.sdk.payment.data
 
+import android.util.Log
+
 class TransactionRepository private constructor(
     private val transDao: TransactionDao
 ) {
@@ -19,6 +21,9 @@ class TransactionRepository private constructor(
     }
 
     fun updateTransaction(errorMessage: String, isSync: Boolean, orderId: String) {
+        Log.w("TransactionRepository","updateTransaction")
+        Log.w("TransactionRepository","\tupdateTransaction, errorMessage:"+errorMessage)
+        Log.w("TransactionRepository","\tupdateTransaction, orderId:"+orderId)
         transDao.updateSync(errorMessage = errorMessage, isSync = isSync, orderId = orderId)
     }
 
@@ -27,6 +32,7 @@ class TransactionRepository private constructor(
     }
 
     fun deleteTransaction(orderId: String) {
+        Log.w("TransactionRepository","deleteTransaction, orderId:"+orderId)
         transDao.deleteTransaction(orderId = orderId)
     }
 

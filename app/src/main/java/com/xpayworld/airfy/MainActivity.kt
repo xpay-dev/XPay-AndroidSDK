@@ -11,11 +11,17 @@ import com.xpayworld.sdk.payment.utils.*
 import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import java.util.*
 
 
-class MainActivity : AppCompatActivity(), PaymentServiceListener {
+class MainActivity : AppCompatActivity(), PaymentServiceListener
+{
     private lateinit var subscription: Disposable
+    private var bluetoothDeviceAddress : String = ""
+    private var isPrintingStarted:Boolean = false
+
     var devices1: MutableList<BluetoothDevice>? = null
 
     override fun onCreate(savedInstanceState: Bundle?)
@@ -35,6 +41,11 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 //            saleData.isOffline = true
             //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
+        // ONE TIME ACTIVATION CODE
+        btn_activate.setOnClickListener {
+            XPayLink.INSTANCE.InitialiseOneTimeActivationCode()
+        }
+
         // CONNECT TO BLUETOOTH DEVICE
         btn_connect.setOnClickListener {
             XPayLink.INSTANCE.Connect()
@@ -51,10 +62,31 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
             XPayLink.INSTANCE.UploadTransaction()
         }
 
+        // START TRANSACTION
+        btn_start.visibility = View.INVISIBLE
+        btn_start.setOnClickListener {
+            XPayLink.INSTANCE.ResetProperties()
+
+            // US DOLLARS
+//                XPayLink.INSTANCE.setAmountPurchase(99.99)
+//                XPayLink.INSTANCE.setCurrencyCode(840)
+//            XPayLink.INSTANCE.setCurrency(Currency.DOLLAR.value)
+//            XPayLink.INSTANCE.setCurrency("USD")
+
+            // PHILIPPINE PESO
+                XPayLink.INSTANCE.setAmountPurchase(23.00)
+                XPayLink.INSTANCE.setCurrencyCode(608)
+                XPayLink.INSTANCE.setCurrency("PHP")
+
+                XPayLink.INSTANCE.setCardCaptureMethod(CardMode.INSERT)
+                XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
+            XPayLink.INSTANCE.Transaction()
+        }
+
         // PRINT
         btn_print.visibility = View.INVISIBLE
         btn_print.setOnClickListener {
-            // XPayLink.INSTANCE.startAction(ActionType.ACTIVATION)
+            // '\n' delimited string implementation
 //            val sReceipt = "       SCOOT        \n"+
 //            "\n"+
 //            "\nnormal sale"+
@@ -76,28 +108,45 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 //            "TOTAL:         SGD 23.00 \n"+
 //            "CASH:          SGD 23.00"+
 //            "\n\n\n\n\n\n\n"
+//
+//            XPayLink.INSTANCE.setCharacterSpacing(2)
+//            XPayLink.INSTANCE.setLineSpacing(2)
+//
+//            XPayLink.INSTANCE.setReceipt(sReceipt)
+//            XPayLink.INSTANCE.PrintBegin()
 
-            val sReceipt = "       SCOOT        \n"+
-                    "       SCOOT        \n"
 
-            XPayLink.INSTANCE.setCharacterSpacing(2)
-            XPayLink.INSTANCE.setLineSpacing(2)
+            // restricted implementation
+            if(!isPrintingStarted)
+            {
+                isPrintingStarted=true
 
-            XPayLink.INSTANCE.setReceipt(sReceipt)
-            XPayLink.INSTANCE.PrintBegin()
-        }
+                XPayLink.INSTANCE.setReceiptHeader("SCOOT")
+                XPayLink.INSTANCE.setReceiptDescription("normal sale\npassenger copy")
+                XPayLink.INSTANCE.setReceiptTabletId(bluetoothDeviceAddress)
+                XPayLink.INSTANCE.setReceiptTicketNumber(2)
 
-        // START TRANSACTION
-        btn_start.visibility = View.INVISIBLE
-        btn_start.setOnClickListener {
-            XPayLink.INSTANCE.ResetProperties()
-                XPayLink.INSTANCE.setAmountPurchase(99.99)
-                XPayLink.INSTANCE.setCurrencyCode(840)
-//                XPayLink.INSTANCE.setCurrency("USD")
-                XPayLink.INSTANCE.setCurrency(Currency.DOLLAR.value)
-                XPayLink.INSTANCE.setCardCaptureMethod(CardMode.INSERT)
-                XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
-            XPayLink.INSTANCE.Transaction()
+                // https://stackoverflow.com/questions/50999112/date-and-time-in-android-studio-kotlin-language
+                val date = Date()
+                val formatter = SimpleDateFormat("yyyy-MM-dd")
+                val answer: String = formatter.format(date)
+                XPayLink.INSTANCE.setReceiptFlightDate(answer)
+
+                XPayLink.INSTANCE.setReceiptFlightNumber("TR147")
+                XPayLink.INSTANCE.setReceiptFlightRoute("ANR-BRU")
+                XPayLink.INSTANCE.setReceiptFlightCrewName("AIRFI-TEST")
+                XPayLink.INSTANCE.setReceiptOrderNumber(XPayLink.INSTANCE.getOrderID())
+
+                XPayLink.INSTANCE.addReceiptSingleOrder("1 Tiger Beer", 8.00)
+
+                XPayLink.INSTANCE.addReceiptComboOrder(
+                    "1 HOT MEAL COMBO"
+                    , "   - Coca Cola Regular\n   - Oriental Treasure Rice"
+                    , 15.00
+                )
+
+                XPayLink.INSTANCE.PrintBegin()
+            }
         }
     }
 
@@ -422,14 +471,15 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
 //        textView.text = "${devices1!![0].name} ${devices1!![0].address}"
 
         textView.text = "${device?.address}"
+        bluetoothDeviceAddress = device?.address.toString()
         btn_start.visibility = View.VISIBLE
-        btn_print.visibility = View.VISIBLE
     }
 
     override fun TransactionComplete()
     {
         textView.text = "Transaction Completed"
         btn_batch.visibility = View.VISIBLE
+        btn_print.visibility = View.VISIBLE
     }
 
     override fun OnBatchUploadResult(totalTxn: Int?, unsyncTxn: Int?)
@@ -446,5 +496,6 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener {
     override fun PrintComplete()
     {
         textView.text = "Print Completed"
+        isPrintingStarted = false
     }
 }

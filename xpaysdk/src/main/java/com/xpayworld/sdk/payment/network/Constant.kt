@@ -37,7 +37,6 @@ class Constant {
             const val TransSign = "TransSignatureCapture"
             const val TransVoidReason = "TransactionVoidReason"
             const val UpdateApp = "UpdateApp"
-
         }
     }
 }

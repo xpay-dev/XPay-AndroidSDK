@@ -160,7 +160,7 @@ class API {
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
                 { result ->
-                    Log.e("SUCCESS",result.message())
+                    Log.w("API",result.message())
                     val response = result.body()!!.data!!
                     callback.invoke(response, txn)
                 },

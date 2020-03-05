@@ -27,6 +27,7 @@ class RetrofitClient
 //                .add(ApiConstants.API_HOST,
 //                        "sha256/4hw5tz+scE+TW+mlai5YipDfFWn1dqvfLG+nU7tq1V8=")
 //                .build()
+
         val interceptor = HttpLoggingInterceptor()
 //        interceptor.level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         interceptor.level = HttpLoggingInterceptor.Level.BODY

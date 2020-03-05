@@ -20,7 +20,20 @@ import com.xpayworld.sdk.payment.utils.*
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.ArrayList
 
+
+// TODO: process for translation
+const val RECEIPT_TABLET_ID = "Tablet : "
+const val RECEIPT_TICKET_NO = "Ticket Number : "
+const val RECEIPT_FLIGHT_DATE = "Flight Date : "
+const val RECEIPT_FLIGHT_NO = "Flight Number : "
+const val RECEIPT_FLIGHT_ROUTE = "Flight Route : "
+const val RECEIPT_CREW_NAME = "Crew : "
+const val RECEIPT_ORDER_NO = "Order No : "
+const val RECEIPT_TOTAL = "TOTAL : "
+const val RECEIPT_CHARGED = "CHARGED : "
+const val RECEIPT_ESC_STR_NEW_LINE_DELIMITER = "\n"
 
 enum class Connection {
     SERIAL, BLUETOOTH
@@ -70,6 +83,45 @@ class Sale {
     var cardMode: CardMode? = null
     var isOffline: Boolean = false
     var timeOut: Int? = 60
+}
+
+/**
+ * for order items that don't have a description
+ * example:
+ * 1 Tiger Beer
+ */
+class ReceiptOrderItemSingle {
+    var item:String = ""
+    var price:Double=0.0
+}
+
+/**
+ * for order items with description of items included
+ * example:
+ * 1 HOT MEAL COMBO
+ * - Coca Cola Regular
+ * - Oriental Treasure Rice
+ */
+class ReceiptOrderItemCombo {
+    var item:String = ""
+    var price:Double = 0.0
+    var description:String = "" // can be '\n' delimited
+}
+
+class ReceiptDetails {
+    var header : String = ""
+    var description : String = ""
+    var tabletId : String = ""
+    var ticketNo : Int = 0
+    var flightDate : String = "" // format: YYYY-MM-dd
+    var flightNo : String = ""
+    var flightRoute : String = ""
+    var crewName : String = ""
+    var orderNo : String = ""
+    var singleItems:ArrayList<ReceiptOrderItemSingle> = ArrayList<ReceiptOrderItemSingle>()
+    var comboItems:ArrayList<ReceiptOrderItemCombo>
+            = ArrayList<ReceiptOrderItemCombo>()
+    var total: Double = 0.0
 }
 
 class PrintOptions {
@@ -123,6 +175,7 @@ class XPayLink
     private var mSelectedDevice: BluetoothDevice? = null
 
     private var mSale: Sale? = null
+    private var mReceiptDetails: ReceiptDetails? = null
     private var mPrintOptions: PrintOptions? = null
     private var mPrintDetails: PrintDetails? = null
     private var mActionType: ActionType? = null
@@ -325,6 +378,7 @@ class XPayLink
 
         val txnArr = mTransactionRepo.getTransaction()
         mTotalTransactions = txnArr.count()
+        Log.d("XPayLink","uploadTransaction, mTotalTransactions:"+mTotalTransactions)
         val dispatch = DispatchGroup()
 
         try {
@@ -337,6 +391,7 @@ class XPayLink
                     API.INSTANCE.callTransaction(txn) { response, purchase ->
                         when (response) {
                             is TransactionResponse -> {
+                                Log.d("XPayLink","uploadTransaction:TransactionResponse")
                                 val result = response.result
                                 if (result?.errNumber != 0.0) {
                                     dispatch.leave()
@@ -640,6 +695,7 @@ class XPayLink
      */
     fun ResetProperties()
     {
+        mReceiptDetails = ReceiptDetails()
         mSale = Sale()
         mSale!!.connection = Connection.BLUETOOTH
         mSale!!.isOffline = true
@@ -663,7 +719,8 @@ class XPayLink
      */
     fun setOrderID(orderID:String)
     {
-        mSale!!.orderId = orderID
+        mSale?.orderId = orderID
+        Log.w("XPayLink","setOrderID(), mSale!!.orderId:" + mSale!!.orderId)
     }
 
     /**
@@ -766,34 +823,36 @@ class XPayLink
     {
         mPrintOptions?.lineSpacing = lineSpace
     }
-    fun setReceipt(printData:String)
-    {
-        val baos = ByteArrayOutputStream()
 
-        baos.write(INIT)
-        baos.write(POWER_ON)
+    // disabled for now
+//    fun setReceipt(printData:String)
+//    {
+//        val baos = ByteArrayOutputStream()
+//
+//        baos.write(INIT)
+//        baos.write(POWER_ON)
+//
+//        baos.write( FONT_SIZE_1 )
+//
+//        baos.write(byteArrayOf(0x1B, 0x20, mPrintOptions?.characterSpacing!!.toByte() ))//char spacing
+//        baos.write(byteArrayOf(0x1B, 0x33, mPrintOptions?.lineSpacing!!.toByte() ))//line spacing
+//
+//        val _arrNewLineDelimitedData = printData.split("\n")
+//        _arrNewLineDelimitedData.forEach { line ->
+//            baos.write(NEW_LINE)
+//            baos.write(line.toByteArray())
+//        }
+//
+//        baos.write(POWER_OFF)
+//
+//        mBaosPrintData = baos
+//    }
 
-        baos.write( FONT_SIZE_1 )
-
-        baos.write(byteArrayOf(0x1B, 0x20, mPrintOptions?.characterSpacing!!.toByte() ))//char spacing
-        baos.write(byteArrayOf(0x1B, 0x33, mPrintOptions?.lineSpacing!!.toByte() ))//line spacing
-
-        val _arrNewLineDelimitedData = printData.split("\n")
-        _arrNewLineDelimitedData.forEach { line ->
-            baos.write(NEW_LINE)
-            baos.write(line.toByteArray())
-        }
-
-        baos.write(POWER_OFF)
-
-        mBaosPrintData = baos
-    }
-
-//#region Receipt Printing Guide
 //    private fun genReceipt(): ByteArray?
 //    {
 //        val lineWidth = 384
-//        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+////        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+//        val size0NoEmphasizeLineWidth = 384 / 9 //line width / font width
 //        var singleLine = ""
 //        for (i in 0 until size0NoEmphasizeLineWidth) {
 //            singleLine += "-"
@@ -804,266 +863,182 @@ class XPayLink
 //        }
 //        try {
 //            val baos = ByteArrayOutputStream()
-//            baos.write (INIT)
-//            baos.write( POWER_ON)
+//            baos.write(INIT)
+//            baos.write(POWER_ON)
 //
-//            baos.write(NEW_LINE)
-//            baos.write(CHAR_SPACING_0)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write(FONT_5X12)
-//            baos.write("Suite 1602, 16/F, Tower 2".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write("Nina Tower, No 8 Yeung Uk Road".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write("Tsuen Wan, N.T., Hong Kong".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_1)
-//            baos.write(FONT_5X12)
-//            baos.write("OFFICIAL RECEIPT".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(FONT_10X18)
-//            baos.write("Form No. 2524".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(FONT_10X18)
-//            baos.write("ROR NO ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("ROR2014-000556-000029".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("DATE/TIME ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("08/20/2014 10:42:46 AM".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("CHAN TAI MAN".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("BIR FORM NO : ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("0605".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("TYPE : ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("AP".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("PERIOD COVERED : ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("2014-8-20".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("ASSESSMENT NO : ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("885".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("DUE DATE : ".toByteArray())
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("2014-8-20".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            var fontSize = 0
-//            var fontWidth = 10 * (fontSize + 1) + (fontSize + 1)
-//            var s1 = "PARTICULARS"
-//            var s2 = "AMOUNT"
-//            var s = s1
-//            var numOfCharacterPerLine = lineWidth / fontWidth
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            fontSize = 0
-//            fontWidth = 10 * (fontSize + 1)
-//            s1 = "BASIC"
-//            s2 = "100.00"
-//            s = s1
-//            numOfCharacterPerLine = lineWidth / fontWidth
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "    SUBCHANGE"
-//            s2 = "500.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "    INTEREST"
-//            s2 = "0.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "    COMPROMISE"
-//            s2 = "0.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "TOTAL"
-//            s2 = "500.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "TOTAL AMOUNT DUE"
-//            s2 = "600.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(FONT_10X18)
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write(doubleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "TOTAL AMOUNT PAID"
-//            s2 = "600.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(FONT_10X18)
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("SIX HUNDRED DOLLARS ONLY".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_10X18)
-//            baos.write("MANNER OF PAYMENT".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write(" ACCOUNTS RECEIVABLE".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("TYPE OF PAYMENT".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write(" FULL".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("MODE OF PAYMENT".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("  CASH".toByteArray())
-//            baos.write(NEW_LINE)
-//            s1 = "  AMOUNT"
-//            s2 = "600.00"
-//            s = s1
-//            for (i in 0 until numOfCharacterPerLine - s1.length - s2.length) {
-//                s += " "
-//            }
-//            s += s2
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(s.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write("REMARKS".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("TEST".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(ALIGN_CENTER)
 //            baos.write(FONT_SIZE_1)
 //            baos.write(EMPHASIZE_ON)
-//            baos.write(FONT_8X12)
-//            baos.write("CARDHOLDER'S COPY".toByteArray())
+//            baos.write(FONT_10X18)
+//            baos.write(ALIGN_CENTER)
+//            baos.write("SCOOT".toByteArray())
+//
 //            baos.write(NEW_LINE)
-//            baos.write(ALIGN_LEFT)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//
 //            baos.write(FONT_SIZE_0)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(singleLine.toByteArray())
+//            baos.write(FONT_10X18)
+//            baos.write(ALIGN_CENTER)
+//            baos.write(EMPHASIZE_ON)
+//            baos.write("normal sale".toByteArray())
+//
 //            baos.write(NEW_LINE)
 //            baos.write(ALIGN_CENTER)
-//            baos.write(FONT_5X12)
-//            baos.write("This is to certify that the amount indicated herein has".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write("been received by the undersigned".toByteArray())
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
 //            baos.write(EMPHASIZE_ON)
+//            baos.write("passenger copy".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//
+////            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Tablet:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("1819D67264CC".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Ticket Number:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("2".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Flight Date:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("2020-02-12".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Flight Number:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("TR147".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Flight Route:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("ANR-BRU".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Crew:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("AIRFI-TEST".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("Order No:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("8dbac0fc-e0ea-4c67-82a6".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("1 Tiger Beer    ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD 8.00".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("1 HOT MEAL COMBO    ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD 15.00".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("     -  Coca Cola Regular".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("     -  Oriental Treasure Rice".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_8X12)
+//            baos.write(singleLine.toByteArray())
+//
+//            baos.write(NEW_LINE)
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+////            baos.write(FONT_10X18)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("TOTAL:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD  23.00".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
 //            baos.write(FONT_10X18)
-//            baos.write("CHAN SIU MING".toByteArray())
-//            baos.write(NEW_LINE)
-//            val barcode = "B B P O S"
-//            val barcodeData =
-//                Hashtable<String, String>()
-//            barcodeData["barcodeDataString"] = barcode
-//            barcodeData["barcodeHeight"] = "" + 50
-//            barcodeData["barcodeType"] = "128"
-//            val barcodeCommand: ByteArray =  getBarcodeCommand(barcodeData)
-//            baos.write(barcodeCommand)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write(FONT_10X18)
-//            baos.write(NEW_LINE)
-//            baos.write(barcode.toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("CHARGED:     ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD  23.00".toByteArray())
+//
+//        //==========================================================================================
+//        // don't write beyond this point
+//
 //            baos.write(NEW_LINE)
 //            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write(NEW_LINE)
+//            baos.write("".toByteArray())
+//
 //            baos.write(POWER_OFF)
+//
 //            return baos.toByteArray()
 //        } catch (e: Exception) {
 //            e.printStackTrace()
 //        }
 //        return null
 //    }
-//#endregion Receipt Printing Guide
-
-
     private fun genReceipt(): ByteArray?
     {
         val lineWidth = 384
-//        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
+    //        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
         val size0NoEmphasizeLineWidth = 384 / 9 //line width / font width
         var singleLine = ""
         for (i in 0 until size0NoEmphasizeLineWidth) {
@@ -1073,173 +1048,256 @@ class XPayLink
         for (i in 0 until size0NoEmphasizeLineWidth) {
             doubleLine += "="
         }
-        try {
+        try
+        {
             val baos = ByteArrayOutputStream()
             baos.write(INIT)
             baos.write(POWER_ON)
 
-            // just printing a blank string for fix of double printing on first run
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write( "".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write( "".toByteArray() )
-            baos.write(NEW_LINE)
-            baos.write(FONT_8X12)
-            baos.write( singleLine.toByteArray() )
         //==========================================================================================
-        // write beyond this point
+        // header
+            if( !mReceiptDetails!!.header.equals("") )
+            {
+                baos.write(FONT_SIZE_1)
+                baos.write(EMPHASIZE_ON)
+                baos.write(FONT_10X18)
+                baos.write(ALIGN_CENTER)
+                //            baos.write("SCOOT".toByteArray())
 
-            baos.write(ALIGN_CENTER)
-            baos.write(NEW_LINE)
-            baos.write("SCOOT".toByteArray())
+                val arrHeaders = mReceiptDetails!!.header.split(RECEIPT_ESC_STR_NEW_LINE_DELIMITER)
+                arrHeaders.forEach { header ->
+                    baos.write(NEW_LINE)
+                    baos.write(header.toByteArray())
+                }
+            }
+
+        //==========================================================================================
+        // description
+            if( !mReceiptDetails!!.description.equals("") )
+            {
+                baos.write(NEW_LINE)
+
+                baos.write(FONT_SIZE_0)
+                baos.write(FONT_10X18)
+                baos.write(ALIGN_CENTER)
+                baos.write(EMPHASIZE_ON)
+                //            baos.write("normal sale".toByteArray())
+
+                //            baos.write(NEW_LINE)
+                //            baos.write(ALIGN_CENTER)
+                //            baos.write(EMPHASIZE_ON)
+                //            baos.write("passenger copy".toByteArray())
+                val arrDesc = mReceiptDetails!!.description.split(RECEIPT_ESC_STR_NEW_LINE_DELIMITER)
+                arrDesc.forEach { desc ->
+                    baos.write(NEW_LINE)
+                    baos.write(desc.toByteArray())
+                }
+            }
+
+        //==========================================================================================
+        // Tablet ID
+            baos.write(FONT_SIZE_0)
+            baos.write(FONT_10X18)
 
             baos.write(NEW_LINE)
             baos.write(NEW_LINE)
-
-            baos.write(NEW_LINE)
-            baos.write(ALIGN_CENTER)
-            baos.write(EMPHASIZE_ON)
-            baos.write("normal sale".toByteArray())
-
-            baos.write(NEW_LINE)
-            baos.write(ALIGN_CENTER)
-            baos.write(EMPHASIZE_ON)
-            baos.write("passenger copy".toByteArray())
-
-            baos.write(NEW_LINE)
             baos.write(NEW_LINE)
 
+            baos.write(ALIGN_LEFT)
+            baos.write(EMPHASIZE_OFF)
+            baos.write(EMPHASIZE_OFF)
+//            baos.write("Tablet :    ".toByteArray())
+            baos.write(RECEIPT_TABLET_ID.toByteArray())
+            baos.write(EMPHASIZE_OFF)
+//            baos.write("1819D67264CC".toByteArray())
+            baos.write(mReceiptDetails!!.tabletId.toByteArray())
+
+        //==========================================================================================
+        // Ticket Number
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Tablet:     ".toByteArray())
+//            baos.write("Ticket Number:     ".toByteArray())
+            baos.write(RECEIPT_TICKET_NO.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("1819D67264CC".toByteArray())
+//            baos.write("2".toByteArray())
+            baos.write(mReceiptDetails!!.ticketNo.toString().toByteArray())
 
+        //==========================================================================================
+        // Flight Date
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Ticket Number:     ".toByteArray())
+//            baos.write("Flight Date:     ".toByteArray())
+            baos.write(RECEIPT_FLIGHT_DATE.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("2".toByteArray())
+//            baos.write("2020-02-12".toByteArray())
+            baos.write(mReceiptDetails!!.flightDate.toByteArray())
 
+        //==========================================================================================
+        // Flight Number
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Flight Date:     ".toByteArray())
+//            baos.write("Flight Number:     ".toByteArray())
+            baos.write(RECEIPT_FLIGHT_NO.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("2020-02-12".toByteArray())
+//            baos.write("TR147".toByteArray())
+            baos.write(mReceiptDetails!!.flightNo.toByteArray())
 
+        //==========================================================================================
+        // Flight Route
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Flight Number:     ".toByteArray())
+//            baos.write("Flight Route:     ".toByteArray())
+            baos.write(RECEIPT_FLIGHT_ROUTE.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("TR147".toByteArray())
+//            baos.write("ANR-BRU".toByteArray())
+            baos.write(mReceiptDetails!!.flightRoute.toByteArray())
 
+        //==========================================================================================
+        // Crew Name
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Flight Route:     ".toByteArray())
+//            baos.write("Crew:     ".toByteArray())
+            baos.write(RECEIPT_CREW_NAME.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("ANR-BRU".toByteArray())
+//            baos.write("AIRFI-TEST".toByteArray())
+            baos.write(mReceiptDetails!!.crewName.toByteArray())
 
+        //==========================================================================================
+        // Order Number
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("Crew:     ".toByteArray())
+//            baos.write("Order No:     ".toByteArray())
+            baos.write(RECEIPT_ORDER_NO.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("AIRFI-TEST".toByteArray())
+//            baos.write("8dbac0fc-e0ea-4c67-82a6".toByteArray())
+            baos.write(mReceiptDetails!!.orderNo.toByteArray())
 
-            baos.write(NEW_LINE)
-            baos.write(FONT_SIZE_0)
-            baos.write(ALIGN_LEFT)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("Order No:     ".toByteArray())
-            baos.write(EMPHASIZE_OFF)
-            baos.write("8dbac0fc-e0ea-4c67-82a6".toByteArray())
-
+        //==========================================================================================
+        // Order Items
             baos.write(NEW_LINE)
 
-            baos.write(NEW_LINE)
-            baos.write(FONT_SIZE_0)
-            baos.write(ALIGN_LEFT)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("1 Tiger Beer    ".toByteArray())
-            baos.write(EMPHASIZE_OFF)
-            baos.write("SGD 8.00".toByteArray())
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("1 Tiger Beer    ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD 8.00".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(FONT_SIZE_0)
+//            baos.write(ALIGN_LEFT)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("1 HOT MEAL COMBO    ".toByteArray())
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("SGD 15.00".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("     -  Coca Cola Regular".toByteArray())
+//
+//            baos.write(NEW_LINE)
+//            baos.write(EMPHASIZE_OFF)
+//            baos.write("     -  Oriental Treasure Rice".toByteArray())
 
-            baos.write(NEW_LINE)
-            baos.write(FONT_SIZE_0)
-            baos.write(ALIGN_LEFT)
-            baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("1 HOT MEAL COMBO    ".toByteArray())
-            baos.write(EMPHASIZE_OFF)
-            baos.write("SGD 15.00".toByteArray())
+            // for single orders
+            if( mReceiptDetails!!.singleItems.count()>0 )
+            {
+                mReceiptDetails!!.singleItems.forEach { singleOrder ->
 
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("     -  Coca Cola Regular".toByteArray())
+                    // add the item name to receipt
+                    baos.write(NEW_LINE)
+                    baos.write(FONT_SIZE_0)
+                    baos.write(ALIGN_LEFT)
+                    baos.write(EMPHASIZE_OFF)
+                    baos.write(singleOrder!!.item.toByteArray())
 
-            baos.write(NEW_LINE)
-            baos.write(EMPHASIZE_OFF)
-            baos.write("     -  Oriental Treasure Rice".toByteArray())
+                    // add the item price to receipt
+                    val strPrice = "   " +mSale!!.currency + " " + singleOrder.price.toString()
+                    baos.write(strPrice.toByteArray())
+                }
+            }
+            // for combo orders
+            if( mReceiptDetails!!.comboItems.count()>0 )
+            {
+                mReceiptDetails!!.comboItems.forEach { comboOrder ->
 
+                    // add the item name to receipt
+                    baos.write(NEW_LINE)
+                    baos.write(FONT_SIZE_0)
+                    baos.write(ALIGN_LEFT)
+                    baos.write(EMPHASIZE_OFF)
+                    baos.write(comboOrder!!.item.toByteArray())
+
+                    // add the item price to receipt
+                    val strPrice = "   " +mSale!!.currency + " " + comboOrder.price.toString()
+                    baos.write(strPrice.toByteArray())
+
+                    // add the description to receipt
+                    val arrComboDesc = comboOrder.description.split(RECEIPT_ESC_STR_NEW_LINE_DELIMITER)
+                    arrComboDesc.forEach { comboDesc ->
+                        baos.write(NEW_LINE)
+                        baos.write(EMPHASIZE_OFF)
+                        baos.write(comboDesc.toByteArray())
+                    }
+                }
+            }
+
+        //==========================================================================================
+        // Total
             baos.write(NEW_LINE)
             baos.write(FONT_8X12)
             baos.write(singleLine.toByteArray())
 
             baos.write(NEW_LINE)
+            baos.write(FONT_10X18)
 
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("TOTAL:     ".toByteArray())
+//            baos.write("TOTAL:     ".toByteArray())
+            baos.write(RECEIPT_TOTAL.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("SGD  23.00".toByteArray())
+//            baos.write("SGD  23.00".toByteArray())
+            val strTotal = mSale!!.currency + " " + mReceiptDetails!!.total
+            baos.write(strTotal.toByteArray())
 
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(FONT_10X18)
             baos.write(EMPHASIZE_OFF)
-            baos.write("CASH:     ".toByteArray())
+//            baos.write("CHARGED:     ".toByteArray())
+            baos.write(RECEIPT_CHARGED.toByteArray())
             baos.write(EMPHASIZE_OFF)
-            baos.write("SGD  23.00".toByteArray())
+//            baos.write("SGD  23.00".toByteArray())
+            val strCharged = mSale!!.currency + " " + mSale!!.amount
+            baos.write(strCharged.toByteArray())
 
         //==========================================================================================
         // don't write beyond this point
-
+        // this is to be able to display the texts above the cutter line
             baos.write(NEW_LINE)
             baos.write(NEW_LINE)
             baos.write(NEW_LINE)
@@ -1260,8 +1318,8 @@ class XPayLink
     fun PrintBegin()
     {
         val print = PrintDetails()
-//            print.data = genReceipt()
-            print.data = mBaosPrintData!!.toByteArray()
+            print.data = genReceipt()
+//            print.data = mBaosPrintData!!.toByteArray()
             print.numOfReceipt = 1
             startAction(ActionType.PRINT(print))
     }
@@ -1279,8 +1337,87 @@ class XPayLink
 
     fun getOrderID():String
     {
+        Log.w("XPayLink", "getOrderID(), mSale!!.orderId:" + mSale!!.orderId )
         return mSale!!.orderId
     }
+
+    fun setReceiptHeader(header:String)
+    {
+        mReceiptDetails?.header = header
+    }
+    fun setReceiptDescription(description:String)
+    {
+        mReceiptDetails?.description = description
+    }
+    fun setReceiptTabletId(tabletId:String)
+    {
+        mReceiptDetails?.tabletId = tabletId
+    }
+    fun setReceiptTicketNumber(ticketNo: Int)
+    {
+        mReceiptDetails?.ticketNo = ticketNo
+    }
+    fun setReceiptFlightDate(flightDate: String)
+    {
+        mReceiptDetails?.flightDate = flightDate
+    }
+    fun setReceiptFlightNumber(flightNo: String)
+    {
+        mReceiptDetails?.flightNo = flightNo
+    }
+    fun setReceiptFlightRoute(flightRoute: String)
+    {
+        mReceiptDetails?.flightRoute = flightRoute
+    }
+    fun setReceiptFlightCrewName(crewName: String)
+    {
+        mReceiptDetails?.crewName = crewName
+    }
+    fun setReceiptOrderNumber(orderNo: String)
+    {
+        mReceiptDetails?.orderNo = orderNo
+    }
+    /**
+     * @param item {String} example: "1 Tiger Beer"
+     * @param price {Double} example: 15.00
+     */
+    fun addReceiptSingleOrder(item:String, price:Double)
+    {
+        val order = ReceiptOrderItemSingle()
+            order.item = item
+            order.price = price
+
+        // add the price to the receipt's total count
+        Log.w("XPayLink","addReceiptSingleOrder(), price:"+price)
+//        mReceiptDetails?.total?.plus(price)
+        mReceiptDetails?.total = mReceiptDetails!!.total + price
+        Log.w("XPayLink","addReceiptSingleOrder(), mReceiptDetails!!.total:"
+                +mReceiptDetails!!.total)
+
+        mReceiptDetails!!.singleItems.add(order)
+    }
+    /**
+     * @param item {String} example: "1 HOT MEAL COMBO"
+     * @param description {String} example: "- Coca Cola Regular\n - Oriental Treasure Rice"
+     * @param price {Double} example: 15.00
+     */
+    fun addReceiptComboOrder(item:String, description:String, price:Double)
+    {
+        val order = ReceiptOrderItemCombo()
+            order.item = item
+            order.description = description
+            order.price = price
+
+        // add the price to the receipt's total count
+        Log.w("XPayLink","addReceiptComboOrder(), price:"+price)
+//        mReceiptDetails?.total?.plus(price)
+        mReceiptDetails?.total = mReceiptDetails!!.total + price
+        Log.w("XPayLink","addReceiptComboOrder(), mReceiptDetails!!.total:"
+                +mReceiptDetails!!.total)
+
+        mReceiptDetails!!.comboItems.add(order)
+    }
+
 //#endregion Public calls
 //================================================================================================//
 //============================================ AirFi =============================================//
