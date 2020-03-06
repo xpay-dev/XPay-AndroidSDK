@@ -24,6 +24,8 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
 
     var devices1: MutableList<BluetoothDevice>? = null
 
+    var transactionNumber:Int = 0
+
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
@@ -41,31 +43,50 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
 //            saleData.isOffline = true
             //XPayLink.INSTANCE.startDevice(ActionType.SALE(saleData))
 
-        // ONE TIME ACTIVATION CODE
+    //==============================================================================================
+    // ONE TIME ACTIVATION CODE
         btn_activate.setOnClickListener {
             XPayLink.INSTANCE.InitialiseOneTimeActivationCode()
         }
 
-        // CONNECT TO BLUETOOTH DEVICE
+    //==============================================================================================
+    // CONNECT TO BLUETOOTH DEVICE
         btn_connect.setOnClickListener {
             XPayLink.INSTANCE.Connect()
         }
 
+    //==============================================================================================
+    // CONNECT TO BLUETOOTH DEVICE
+        btn_disconnect.setOnClickListener {
+            XPayLink.INSTANCE.Disconnect()
+        }
+
+    //==============================================================================================
+    // PIN ENTRY
         btn_pin.setOnClickListener {
             XPayLink.INSTANCE.ShowPinEntry()
         }
 
-        // UPLOAD TRANSACTIONS
-        btn_batch.visibility = View.INVISIBLE
-        btn_batch.setOnClickListener {
+    //==============================================================================================
+    // UPLOAD TRANSACTIONS
+        btn_upload.visibility = View.INVISIBLE
+        btn_upload.setOnClickListener {
 //            XPayLink.INSTANCE.startAction(ActionType.BATCH_UPLOAD)v
             XPayLink.INSTANCE.UploadTransaction()
         }
 
-        // START TRANSACTION
-        btn_start.visibility = View.INVISIBLE
-        btn_start.setOnClickListener {
+    //==============================================================================================
+    // START TRANSACTION SIMPLE
+        btn_start1.visibility = View.INVISIBLE
+        btn_start1.setOnClickListener {
+
+            btn_upload.visibility = View.INVISIBLE
+            btn_print.visibility = View.INVISIBLE
+
+            transactionNumber=1
             XPayLink.INSTANCE.ResetProperties()
+
+            textView.text = "Transaction Processing..."
 
             // US DOLLARS
 //                XPayLink.INSTANCE.setAmountPurchase(99.99)
@@ -83,42 +104,59 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
             XPayLink.INSTANCE.Transaction()
         }
 
-        // PRINT
+    //==============================================================================================
+    // START TRANSACTION WITH DEDUCTION
+        btn_start2.visibility = View.INVISIBLE
+        btn_start2.setOnClickListener {
+
+            btn_upload.visibility = View.INVISIBLE
+            btn_print.visibility = View.INVISIBLE
+
+            textView.text = "Transaction Processing..."
+
+            transactionNumber=2
+            XPayLink.INSTANCE.ResetProperties()
+
+            XPayLink.INSTANCE.setAmountPurchase(1.50)
+            XPayLink.INSTANCE.setCurrencyCode(608)
+            XPayLink.INSTANCE.setCurrency("PHP")
+
+            XPayLink.INSTANCE.setCardCaptureMethod(CardMode.INSERT)
+            XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
+            XPayLink.INSTANCE.Transaction()
+        }
+
+    //==============================================================================================
+    // START TRANSACTION WITH TAX
+        btn_start3.visibility = View.INVISIBLE
+        btn_start3.setOnClickListener {
+
+            btn_upload.visibility = View.INVISIBLE
+            btn_print.visibility = View.INVISIBLE
+
+            textView.text = "Transaction Processing..."
+
+            transactionNumber=3
+            XPayLink.INSTANCE.ResetProperties()
+
+            XPayLink.INSTANCE.setAmountPurchase(63.00)
+            XPayLink.INSTANCE.setCurrencyCode(608)
+            XPayLink.INSTANCE.setCurrency("PHP")
+
+            XPayLink.INSTANCE.setCardCaptureMethod(CardMode.INSERT)
+            XPayLink.INSTANCE.setOrderID(randomAlphaNumericString(30))
+            XPayLink.INSTANCE.Transaction()
+        }
+
+    //==============================================================================================
+    // PRINT
         btn_print.visibility = View.INVISIBLE
         btn_print.setOnClickListener {
-            // '\n' delimited string implementation
-//            val sReceipt = "       SCOOT        \n"+
-//            "\n"+
-//            "\nnormal sale"+
-//            "\npassenger copy"+
-//            "\n\n"+
-//            "Tablet: jhafkjagfkjafakjdhg \n"+
-//            "Ticket Number: 71615471674617 \n"+
-//            "Flight Date: 2020-02-12 \n"+
-//            "Flight Route: ANR-BRU \n"+
-//            "Crew: AIRFI-TEST \n"+
-//            "Order No: 6336336289902 \n"+
-//            "\n"+
-//            "1 Tiger Beer           SGD 8.00 \n"+
-//            "1 HOT MEAL COMBO       SGD 15.00 \n"+
-//            "   -   Coca Cola Regular \n"+
-//            "   -   Oriental Treasure Rice \n"+
-//            "------------------------------------------------------\n"+
-//            "\n\n"+
-//            "TOTAL:         SGD 23.00 \n"+
-//            "CASH:          SGD 23.00"+
-//            "\n\n\n\n\n\n\n"
-//
-//            XPayLink.INSTANCE.setCharacterSpacing(2)
-//            XPayLink.INSTANCE.setLineSpacing(2)
-//
-//            XPayLink.INSTANCE.setReceipt(sReceipt)
-//            XPayLink.INSTANCE.PrintBegin()
-
-
+            Log.w("MainActivity","btn_print.setOnClickListener(), isPrintingStarted:"+
+                    isPrintingStarted.toString() )
             // restricted implementation
-            if(!isPrintingStarted)
-            {
+//            if(!isPrintingStarted)
+//            {
                 isPrintingStarted=true
 
                 XPayLink.INSTANCE.setReceiptHeader("SCOOT")
@@ -126,7 +164,7 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
                 XPayLink.INSTANCE.setReceiptTabletId(bluetoothDeviceAddress)
                 XPayLink.INSTANCE.setReceiptTicketNumber(2)
 
-                // https://stackoverflow.com/questions/50999112/date-and-time-in-android-studio-kotlin-language
+    // https://stackoverflow.com/questions/50999112/date-and-time-in-android-studio-kotlin-language
                 val date = Date()
                 val formatter = SimpleDateFormat("yyyy-MM-dd")
                 val answer: String = formatter.format(date)
@@ -137,6 +175,10 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
                 XPayLink.INSTANCE.setReceiptFlightCrewName("AIRFI-TEST")
                 XPayLink.INSTANCE.setReceiptOrderNumber(XPayLink.INSTANCE.getOrderID())
 
+
+                // Order
+            if(transactionNumber==1)
+            {
                 XPayLink.INSTANCE.addReceiptSingleOrder("1 Tiger Beer", 8.00)
 
                 XPayLink.INSTANCE.addReceiptComboOrder(
@@ -144,9 +186,24 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
                     , "   - Coca Cola Regular\n   - Oriental Treasure Rice"
                     , 15.00
                 )
-
-                XPayLink.INSTANCE.PrintBegin()
             }
+            else if(transactionNumber==2)
+            {
+                // Sample of reduction methods
+                XPayLink.INSTANCE.addReceiptSingleOrder("1 Tai Sun Roasted (Cash)", 3.00)
+//                XPayLink.INSTANCE.addReceiptSingleOrder("1 Discount", -1.50)
+                XPayLink.INSTANCE.subtractReceiptItem("1 Discount", 1.50)
+            }
+            else if(transactionNumber==3)
+            {
+                // Sample of misc
+                XPayLink.INSTANCE.addReceiptSingleOrder("1 SEAT UPGRADE", 60.00)
+//                XPayLink.INSTANCE.addReceiptAfterTotalsByPrice("IGST    5.00%", 3.00)
+                XPayLink.INSTANCE.addReceiptAfterTotalsByPercent("IGST", 5.00)
+            }
+            //======================================================================================
+                XPayLink.INSTANCE.PrintBegin()
+//            }
         }
     }
 
@@ -472,13 +529,16 @@ class MainActivity : AppCompatActivity(), PaymentServiceListener
 
         textView.text = "${device?.address}"
         bluetoothDeviceAddress = device?.address.toString()
-        btn_start.visibility = View.VISIBLE
+        btn_start1.visibility = View.VISIBLE
+        btn_start2.visibility = View.VISIBLE
+        btn_start3.visibility = View.VISIBLE
     }
 
     override fun TransactionComplete()
     {
         textView.text = "Transaction Completed"
-        btn_batch.visibility = View.VISIBLE
+        isPrintingStarted = false
+        btn_upload.visibility = View.VISIBLE
         btn_print.visibility = View.VISIBLE
     }
 

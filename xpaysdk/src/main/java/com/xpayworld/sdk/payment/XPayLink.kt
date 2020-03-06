@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.net.ConnectivityManager
+import android.os.Handler
 import android.util.Log
 import com.bbpos.bbdevice.BBDeviceController
 import com.bbpos.bbdevice.BBDeviceController.CurrencyCharacter
@@ -96,6 +97,17 @@ class ReceiptOrderItemSingle {
 }
 
 /**
+ * will be added at the bottom of the totals
+ * for order items that don't have a description
+ * example:
+ * 1 Tiger Beer
+ */
+class ReceiptOrderMisc {
+    var item:String = ""
+    var price:Double=0.0
+}
+
+/**
  * for order items with description of items included
  * example:
  * 1 HOT MEAL COMBO
@@ -121,6 +133,7 @@ class ReceiptDetails {
     var singleItems:ArrayList<ReceiptOrderItemSingle> = ArrayList<ReceiptOrderItemSingle>()
     var comboItems:ArrayList<ReceiptOrderItemCombo>
             = ArrayList<ReceiptOrderItemCombo>()
+    var miscItems:ArrayList<ReceiptOrderMisc> = ArrayList<ReceiptOrderMisc>()
     var total: Double = 0.0
 }
 
@@ -318,7 +331,6 @@ class XPayLink
 
     fun setBTConnection(device: BluetoothDevice)
     {
-        Log.w("XPayLink","setBTConnection")
         mSelectedDevice = device
         mBBDeviceController?.connectBT(device)
     }
@@ -441,14 +453,10 @@ class XPayLink
     }
 
     private fun isActivated(): Boolean {
-        Log.w("XPayLink","isActivated(), SharedPref.INSTANCE.readMessage(PosWS.PREF_ACTIVATION)):"
-            +SharedPref.INSTANCE.readMessage(PosWS.PREF_ACTIVATION))
         return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_ACTIVATION)
     }
 
     private fun hasEnteredPin(): Boolean {
-        Log.w("XPayLink","isActivated(), SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN):"
-                +SharedPref.INSTANCE.readMessage(PosWS.PREF_PIN))
         return !SharedPref.INSTANCE.isEmpty(PosWS.PREF_PIN)
     }
 
@@ -522,7 +530,6 @@ class XPayLink
     @SuppressLint("SimpleDateFormat")
     private fun startEMV()
     {
-        Log.w("XPayLink","private startEMV")
         mBBDeviceController?.getDeviceInfo()
         ProgressDialog.INSTANCE.message("PROCESS TRANSACTION")
 
@@ -532,15 +539,12 @@ class XPayLink
         // TODO: fix random alphanumeric number causing error in app
 //            data["orderID"] = "0123456789ABCDEF0123456789ABCDEF"
             data["orderID"] = mSale?.orderId
-            Log.w("XPayLink","private startEMV, data[\"orderID\"]:"+data["orderID"].toString() )
 
 //            data["randomNumber"] = "012345"
 
             data["checkCardMode"] = valueOf(value = mSale?.cardMode!!.ordinal)
-            Log.w("XPayLink","private startEMV, data[\"checkCardMode\"]:"+data["checkCardMode"].toString() )
 
             data["terminalTime"] = SimpleDateFormat("yyMMddHHmmss").format(Calendar.getInstance().time)
-            Log.w("XPayLink","private startEMV, data[\"checkCardMode\"]:"+data["terminalTime"].toString() )
 
         mBBDeviceController?.startEmv(data)
     }
@@ -609,13 +613,6 @@ class XPayLink
 
     private fun setAmount()
     {
-        Log.w("XPayLink","setAmount")
-        Log.w("XPayLink","setAmount, mSale!!.amount:"
-                +mSale!!.amount.toString() )
-
-        Log.w("XPayLink","setAmount, mSale?.currency:"
-                + mSale?.currency.toString() )
-
         ProgressDialog.INSTANCE.show()
         ProgressDialog.INSTANCE.message("CONFIRM AMOUNT")
 
@@ -643,8 +640,6 @@ class XPayLink
             if(getCurrencyCharacterByString(mSale?.currency)==CurrencyCharacter.SPACE)
             {
                 val currencyCode = mSale?.currency?.split("")
-                Log.w("XPayLink","setAmount, currencyCode:"
-                        +currencyCode.toString() )
                 val currencyCharacter = arrayOf(
                     getCurrencyCharacterByLetter(currencyCode?.get(1)),
                     getCurrencyCharacterByLetter(currencyCode?.get(2)),
@@ -678,7 +673,6 @@ class XPayLink
     fun Connect()
     {
         IntToLeadingZeroByte(255)
-//        Log.w("XPayLink","Connect(), str:"+str)
         mBBDeviceController?.startBTScan(DEVICE_NAMES,60)
     }
 
@@ -720,7 +714,6 @@ class XPayLink
     fun setOrderID(orderID:String)
     {
         mSale?.orderId = orderID
-        Log.w("XPayLink","setOrderID(), mSale!!.orderId:" + mSale!!.orderId)
     }
 
     /**
@@ -735,8 +728,6 @@ class XPayLink
     fun setAmountPurchase(transactionAmount:Double)
     {
         mSale?.amount = transactionAmount
-        Log.w("XPayLink","setAmountPurchase(), mSale?.amount:"
-                + mSale?.amount.toString() )
     }
 
     /**
@@ -747,8 +738,6 @@ class XPayLink
     fun setCurrencyCode(currencyCode:Int)
     {
         mSale?.currencyCode = currencyCode
-        Log.w("XPayLink","setAmountPurchase(), mSale?.currencyCode:"
-                + mSale?.currencyCode.toString() )
     }
 
     /**
@@ -759,8 +748,6 @@ class XPayLink
     fun setCurrency(currencyName:String)
     {
         mSale?.currency = currencyName
-        Log.w("XPayLink","setAmountPurchase(), mSale?.currency:"
-                + mSale?.currency.toString() )
     }
 
     /**
@@ -769,8 +756,6 @@ class XPayLink
     fun setCardCaptureMethod(cardCaptureMode:CardMode)
     {
         mSale?.cardMode = cardCaptureMode
-        Log.w("XPayLink","setAmountPurchase(), mSale?.cardMode:"
-                + mSale?.cardMode.toString() )
     }
 
     // TODO: what is this for?
@@ -806,7 +791,6 @@ class XPayLink
 // For Uploading
     fun UploadTransaction()
     {
-        Log.w("XPayLink","UploadTransaction()")
         startAction(ActionType.BATCH_UPLOAD)
     }
 
@@ -824,217 +808,6 @@ class XPayLink
         mPrintOptions?.lineSpacing = lineSpace
     }
 
-    // disabled for now
-//    fun setReceipt(printData:String)
-//    {
-//        val baos = ByteArrayOutputStream()
-//
-//        baos.write(INIT)
-//        baos.write(POWER_ON)
-//
-//        baos.write( FONT_SIZE_1 )
-//
-//        baos.write(byteArrayOf(0x1B, 0x20, mPrintOptions?.characterSpacing!!.toByte() ))//char spacing
-//        baos.write(byteArrayOf(0x1B, 0x33, mPrintOptions?.lineSpacing!!.toByte() ))//line spacing
-//
-//        val _arrNewLineDelimitedData = printData.split("\n")
-//        _arrNewLineDelimitedData.forEach { line ->
-//            baos.write(NEW_LINE)
-//            baos.write(line.toByteArray())
-//        }
-//
-//        baos.write(POWER_OFF)
-//
-//        mBaosPrintData = baos
-//    }
-
-//    private fun genReceipt(): ByteArray?
-//    {
-//        val lineWidth = 384
-////        val size0NoEmphasizeLineWidth = 384 / 8 //line width / font width
-//        val size0NoEmphasizeLineWidth = 384 / 9 //line width / font width
-//        var singleLine = ""
-//        for (i in 0 until size0NoEmphasizeLineWidth) {
-//            singleLine += "-"
-//        }
-//        var doubleLine = ""
-//        for (i in 0 until size0NoEmphasizeLineWidth) {
-//            doubleLine += "="
-//        }
-//        try {
-//            val baos = ByteArrayOutputStream()
-//            baos.write(INIT)
-//            baos.write(POWER_ON)
-//
-//            baos.write(FONT_SIZE_1)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write(FONT_10X18)
-//            baos.write(ALIGN_CENTER)
-//            baos.write("SCOOT".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//
-//            baos.write(FONT_SIZE_0)
-//            baos.write(FONT_10X18)
-//            baos.write(ALIGN_CENTER)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("normal sale".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(ALIGN_CENTER)
-//            baos.write(EMPHASIZE_ON)
-//            baos.write("passenger copy".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//
-////            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Tablet:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("1819D67264CC".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Ticket Number:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("2".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Flight Date:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("2020-02-12".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Flight Number:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("TR147".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Flight Route:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("ANR-BRU".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Crew:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("AIRFI-TEST".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("Order No:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("8dbac0fc-e0ea-4c67-82a6".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("1 Tiger Beer    ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD 8.00".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("1 HOT MEAL COMBO    ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD 15.00".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("     -  Coca Cola Regular".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("     -  Oriental Treasure Rice".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_8X12)
-//            baos.write(singleLine.toByteArray())
-//
-//            baos.write(NEW_LINE)
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-////            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("TOTAL:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD  23.00".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(FONT_10X18)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("CHARGED:     ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD  23.00".toByteArray())
-//
-//        //==========================================================================================
-//        // don't write beyond this point
-//
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write(NEW_LINE)
-//            baos.write("".toByteArray())
-//
-//            baos.write(POWER_OFF)
-//
-//            return baos.toByteArray()
-//        } catch (e: Exception) {
-//            e.printStackTrace()
-//        }
-//        return null
-//    }
     private fun genReceipt(): ByteArray?
     {
         val lineWidth = 384
@@ -1194,31 +967,6 @@ class XPayLink
         // Order Items
             baos.write(NEW_LINE)
 
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("1 Tiger Beer    ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD 8.00".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(FONT_SIZE_0)
-//            baos.write(ALIGN_LEFT)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("1 HOT MEAL COMBO    ".toByteArray())
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("SGD 15.00".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("     -  Coca Cola Regular".toByteArray())
-//
-//            baos.write(NEW_LINE)
-//            baos.write(EMPHASIZE_OFF)
-//            baos.write("     -  Oriental Treasure Rice".toByteArray())
-
             // for single orders
             if( mReceiptDetails!!.singleItems.count()>0 )
             {
@@ -1232,7 +980,9 @@ class XPayLink
                     baos.write(singleOrder!!.item.toByteArray())
 
                     // add the item price to receipt
-                    val strPrice = "   " +mSale!!.currency + " " + singleOrder.price.toString()
+//                    val strPrice = "   " +mSale!!.currency + " " + singleOrder.price.toString()
+                    val strPrice = "   " +mSale!!.currency + " " +
+                            String.format("%.2f",singleOrder.price)
                     baos.write(strPrice.toByteArray())
                 }
             }
@@ -1249,7 +999,9 @@ class XPayLink
                     baos.write(comboOrder!!.item.toByteArray())
 
                     // add the item price to receipt
-                    val strPrice = "   " +mSale!!.currency + " " + comboOrder.price.toString()
+//                    val strPrice = "   " +mSale!!.currency + " " + comboOrder.price.toString()
+                    val strPrice = "   " +mSale!!.currency + " " +
+                            String.format("%.2f",comboOrder.price)
                     baos.write(strPrice.toByteArray())
 
                     // add the description to receipt
@@ -1275,25 +1027,47 @@ class XPayLink
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(EMPHASIZE_OFF)
 //            baos.write("TOTAL:     ".toByteArray())
             baos.write(RECEIPT_TOTAL.toByteArray())
             baos.write(EMPHASIZE_OFF)
 //            baos.write("SGD  23.00".toByteArray())
-            val strTotal = mSale!!.currency + " " + mReceiptDetails!!.total
+//            val strTotal = mSale!!.currency + " " + mReceiptDetails!!.total
+            val strTotal = mSale!!.currency + " " + String.format("%.2f",mReceiptDetails!!.total)
             baos.write(strTotal.toByteArray())
 
             baos.write(NEW_LINE)
             baos.write(FONT_SIZE_0)
             baos.write(ALIGN_LEFT)
             baos.write(EMPHASIZE_OFF)
-            baos.write(EMPHASIZE_OFF)
 //            baos.write("CHARGED:     ".toByteArray())
             baos.write(RECEIPT_CHARGED.toByteArray())
             baos.write(EMPHASIZE_OFF)
 //            baos.write("SGD  23.00".toByteArray())
-            val strCharged = mSale!!.currency + " " + mSale!!.amount
+//            val strCharged = mSale!!.currency + " " + mSale!!.amount
+            val strCharged = mSale!!.currency + " " + String.format("%.2f", mSale!!.amount)
             baos.write(strCharged.toByteArray())
+
+        //==========================================================================================
+        // Misc
+            if( mReceiptDetails!!.miscItems.count()>0 )
+            {
+                baos.write(NEW_LINE)
+                baos.write(FONT_10X18)
+
+                mReceiptDetails!!.miscItems.forEach { miscOrder ->
+
+                    baos.write(NEW_LINE)
+                    baos.write(FONT_SIZE_0)
+                    baos.write(ALIGN_LEFT)
+                    baos.write(EMPHASIZE_OFF)
+                    var strItem = miscOrder.item + "    "
+                    baos.write(strItem.toByteArray())
+
+//                    val strPrice = mSale!!.currency + " " + miscOrder.price.toString()
+                    val strPrice = mSale!!.currency + " " + String.format("%.2f",miscOrder.price)
+                    baos.write(strPrice.toByteArray())
+                }
+            }
 
         //==========================================================================================
         // don't write beyond this point
@@ -1312,6 +1086,7 @@ class XPayLink
             return baos.toByteArray()
         } catch (e: Exception) {
             e.printStackTrace()
+            Log.e("XPaylink","genReceipt(), e.message:" + e.message)
         }
         return null
     }
@@ -1337,7 +1112,6 @@ class XPayLink
 
     fun getOrderID():String
     {
-        Log.w("XPayLink", "getOrderID(), mSale!!.orderId:" + mSale!!.orderId )
         return mSale!!.orderId
     }
 
@@ -1388,14 +1162,12 @@ class XPayLink
             order.price = price
 
         // add the price to the receipt's total count
-        Log.w("XPayLink","addReceiptSingleOrder(), price:"+price)
 //        mReceiptDetails?.total?.plus(price)
         mReceiptDetails?.total = mReceiptDetails!!.total + price
-        Log.w("XPayLink","addReceiptSingleOrder(), mReceiptDetails!!.total:"
-                +mReceiptDetails!!.total)
 
         mReceiptDetails!!.singleItems.add(order)
     }
+
     /**
      * @param item {String} example: "1 HOT MEAL COMBO"
      * @param description {String} example: "- Coca Cola Regular\n - Oriental Treasure Rice"
@@ -1409,13 +1181,61 @@ class XPayLink
             order.price = price
 
         // add the price to the receipt's total count
-        Log.w("XPayLink","addReceiptComboOrder(), price:"+price)
 //        mReceiptDetails?.total?.plus(price)
         mReceiptDetails?.total = mReceiptDetails!!.total + price
-        Log.w("XPayLink","addReceiptComboOrder(), mReceiptDetails!!.total:"
-                +mReceiptDetails!!.total)
 
         mReceiptDetails!!.comboItems.add(order)
+    }
+
+    /**
+     * @param item {String} example: "1 Discount"
+     * @param price {Double} example: 1.50 ( don't put '-' as this is processed by the printing )
+     */
+    fun subtractReceiptItem(item:String, price:Double)
+    {
+        val order = ReceiptOrderItemSingle()
+        order.item = item
+        order.price = (price*-1)
+
+        mReceiptDetails?.total = mReceiptDetails!!.total + (price*-1)
+
+        mReceiptDetails!!.singleItems.add(order)
+    }
+
+    /**
+     * This will be added after the totals
+     *
+     * @param item {String} example: "IGST  5%"
+     * @param price {Double} example: 15.00
+     */
+    fun addReceiptAfterTotalsByPrice(item:String, price:Double)
+    {
+        val order = ReceiptOrderMisc()
+            order.item = item
+            order.price = price
+
+        mReceiptDetails?.total = mReceiptDetails!!.total + price
+
+        mReceiptDetails!!.miscItems.add(order)
+    }
+
+    /**
+     * This will be added after the totals
+     *
+     * @param item {String} example: "IGST"
+     * @param price {Double} example: 5.00
+     */
+    fun addReceiptAfterTotalsByPercent(item:String, percentage:Double)
+    {
+        val order = ReceiptOrderMisc()
+            order.item = item + "   " + percentage.toString()+"%"
+            order.price = percentage
+
+        val price = mReceiptDetails!!.total*(percentage/100)
+
+        mReceiptDetails?.total = mReceiptDetails!!.total + price
+
+        mReceiptDetails!!.miscItems.add(order)
     }
 
 //#endregion Public calls
@@ -1466,7 +1286,6 @@ class XPayLink
 
         override fun onBTConnected(p0: BluetoothDevice?)
         {
-            Log.w("XPayLink","onBTConnected, p0:" + p0.toString() )
             mSelectedDevice = p0
             mPrintOptions = PrintOptions()
             mListener?.OnTerminalConnectedChanged(p0)
@@ -1598,11 +1417,12 @@ class XPayLink
 
         override fun onReturnTransactionResult(result: BBDeviceController.TransactionResult?)
         {
-            Log.w("XPayLink","onReturnTransactionResult, result:"+result.toString() )
             ProgressDialog.INSTANCE.dismiss()
             if (result == BBDeviceController.TransactionResult.APPROVED){
 //                mListener?.onTransactionComplete()
-                mListener?.TransactionComplete()
+                Handler().postDelayed({
+                    mListener?.TransactionComplete()
+                }, 3000)
                 return
             }
 //            mListener?.onError(result?.ordinal, result?.name)
@@ -1636,7 +1456,6 @@ class XPayLink
         }
 
         override fun onBTReturnScanResults(devices: MutableList<BluetoothDevice>?) {
-            Log.w("XPayLink","onBTReturnScanResults, devices:"+devices.toString() )
 //            mListener?.onBluetoothScanResult(devices)
 //            mListener?.onBluetoothScanResult(devices)
 //            mListener?.OnTerminalConnectedChanged(devices)
@@ -1771,28 +1590,12 @@ class XPayLink
         }
 
         override fun onSerialConnected() {
-            Log.w("XPayLink","onSerialConnected")
             startEMV()
         }
 
         override fun onReturnBatchData(tlv: String?)
         {
-            Log.w("XpayLink","onReturnBatchData(), tlv:"+tlv.toString() )
             val decodeData = BBDeviceController.decodeTlv(tlv)
-            Log.w("XpayLink","onReturnBatchData(), decodeData:"+decodeData.toString() )
-//                mCard.emvICCData = decodeData["C2"].toString()
-//                mCard.expiryDate = decodeData["5F24"].toString()
-//                mCard.ksn = decodeData["C0"].toString()
-//                mCard.cardNumber = decodeData["5A"].toString()
-//                mCard.cardXNumber = decodeData["C4"].toString()
-//
-//                var trans = Transaction()
-//                trans.amount = mSale!!.amount.div(100.0)
-//                trans.currency = mSale!!.currency
-//                trans.orderId = mSale!!.orderId
-//                trans.isOffline = mSale!!.isOffline
-//                trans.card = mCard
-//                trans.timestamp = System.currentTimeMillis()
         }
 
         override fun onReturnEncryptDataResult(p0: Boolean, p1: Hashtable<String, String>?) {
